@@ -20,13 +20,15 @@ transform = transforms.Compose([
         transforms.ToTensor()
     ])
 
-rootFolder = "/tmp/pycharm_project_812/Datasets/Test_data"
+rootFolder = "~/pycharm_project_alfred/Datasets/Test_data"
 dataset = CDONdataset("test_data.csv", rootFolder, transform=transform)
 # train_set, test_set = torch.utils.data.random_split(dataset, [1, 1])
-train_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+train_loader = DataLoader(dataset=dataset, batch_size=2, shuffle=False)
+
+train_images, train_labels = train_loader
 
 for train_images, train_labels in train_loader:
     print(train_images.shape)
     print(train_labels)
-plt.imshow(train_images.permute( 2, 3, 1, 0)[:,:,:,0])
+plt.imshow(train_images.permute(2, 3, 1, 0)[:, :, :, 0])
 plt.savefig("Results/test.jpg")
