@@ -32,4 +32,3 @@ class ConvBlock(nn.Module):
 
         out = F.relu(out)
         return out
-

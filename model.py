@@ -26,7 +26,7 @@ class ResNet18(nn.Module):
         self.output = nn.Linear(in_features=512, out_features=10)
 
     def add_block_layer(self, n_layers, stride, out_channels):
-        # stride_for_each_layer_list = [1,1]
+        # stride_for_each_layer_list = [stride] concatonated with [1, 1, .....]
         stride_for_each_layer_list = [stride] + [1] * (n_layers-1)
         layers = []
         for stride in stride_for_each_layer_list:
