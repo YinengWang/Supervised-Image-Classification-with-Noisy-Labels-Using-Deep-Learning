@@ -9,6 +9,7 @@ from Custom_dataset import CDONdataset
 from conv_block import ConvBlock
 from model import ResNet18
 
+
 def load_dataset():
 
     # Data
@@ -45,12 +46,17 @@ def load_dataset():
 
 def main():
     train_loader = load_dataset()
+    x = None
+    for train_images, train_labels in train_loader:
+        print(train_images.shape)
+        print(train_labels)
+        x = train_images
+
     layers_in_each_block_list = [2, 2, 2, 2]
     model = ResNet18(layers_in_each_block_list)
 
-    x = np.random.rand(1, 3, 32, 32)
-
-    out = model.forward(torch.tensor(x).float())
+    # classify 2 images
+    out = model.forward(x)
     print(out.shape)
     pass
 
