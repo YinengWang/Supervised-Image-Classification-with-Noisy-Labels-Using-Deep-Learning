@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ConvBlock(nn.Module):
-    # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros')
+    # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True,
+    # padding_mode='zeros')
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
         super().__init__()
         self.conv_1 = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
@@ -11,6 +13,8 @@ class ConvBlock(nn.Module):
         self.batch_norm_1 = nn.BatchNorm2d(in_channels_for_batch_norm)
         self.conv_2 = nn.Conv2d(out_channels, out_channels, kernel_size, stride, padding)
         self.batch_norm_2 = nn.BatchNorm2d(out_channels)
+        self.shortcut = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1),
+                                      nn.BatchNorm2d(out_channels))
 
     def forward(self, x):
         out = self.conv_1(x)
@@ -19,6 +23,9 @@ class ConvBlock(nn.Module):
 
         out = self.conv_2(out)
         out = self.batch_norm_2(out)
+
+        out += self.shortcut(x)
+
         out = F.relu(out)
         return out
 
