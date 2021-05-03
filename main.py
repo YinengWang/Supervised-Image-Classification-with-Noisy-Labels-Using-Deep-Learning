@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 from Custom_dataset import CDONdataset
 from conv_block import ConvBlock
-
+from model import ResNet18
 
 def load_dataset():
 
@@ -45,6 +45,10 @@ def load_dataset():
 
 def main():
     train_loader = load_dataset()
+    layers_in_each_block_list = [2, 2, 2, 2]
+    model = ResNet18(layers_in_each_block_list)
+
+    pass
 
 
 if __name__ == '__main__':
