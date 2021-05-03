@@ -34,3 +34,30 @@ class ResNet18(nn.Module):
             self.in_channels = out_channels
 
         return nn.Sequential(*layers)
+
+    def forward(self, x):
+        # input shape torch.Size([128, 3, 32, 32])
+        # after relu shape torch.Size([128, 64, 32, 32])
+        # after residual_block_1 torch.Size([128, 64, 32, 32])
+        # after residual_block_2 torch.Size([128, 128, 16, 16])
+        # after residual_block_3 torch.Size([128, 256, 8, 8])
+        # after residual_block_4 torch.Size([128, 512, 4, 4])
+        # after ave pool torch.Size([128, 512, 1, 1])
+        # after reshape torch.Size([128, 512])
+
+        out = self.conv_1(x)
+        out = self.batch_norm_1(out)
+        out = F.relu(out)
+
+        # begin residual blocks 4 * 4
+        out = self.residual_block_1(out)
+        out = self.residual_block_2(out)
+        out = self.residual_block_3(out)
+        out = self.residual_block_4(out)
+
+        # ave pool 1*1
+        out = F.avg_pool2d(out, 4)
+        out = out.view(out.size(0), -1)
+        out = self.output(out)
+
+        return out
