@@ -48,6 +48,10 @@ def main():
     layers_in_each_block_list = [2, 2, 2, 2]
     model = ResNet18(layers_in_each_block_list)
 
+    x = np.random.rand(1, 3, 32, 32)
+
+    out = model.forward(torch.tensor(x).float())
+    print(out.shape)
     pass
 
 

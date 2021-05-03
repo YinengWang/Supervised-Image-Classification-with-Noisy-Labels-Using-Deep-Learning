@@ -8,7 +8,7 @@ class ResNet18(nn.Module):
     def __init__(self, layers_in_each_block_list):
         super().__init__()
         self.in_channels = 64
-        self.conv_1 = nn.Conv2d(3, 64, kernel_size=3)
+        self.conv_1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.batch_norm_1 = nn.BatchNorm2d(64)
 
         self.residual_block_1 = self.add_block_layer(out_channels=64,
@@ -16,13 +16,13 @@ class ResNet18(nn.Module):
                                                      stride=1)
         self.residual_block_2 = self.add_block_layer(out_channels=128,
                                                      n_layers=layers_in_each_block_list[1],
-                                                     stride=1)
+                                                     stride=2)
         self.residual_block_3 = self.add_block_layer(out_channels=256,
                                                      n_layers=layers_in_each_block_list[2],
-                                                     stride=1)
+                                                     stride=2)
         self.residual_block_4 = self.add_block_layer(out_channels=512,
                                                      n_layers=layers_in_each_block_list[3],
-                                                     stride=1)
+                                                     stride=2)
         self.output = nn.Linear(in_features=512, out_features=10)
 
     def add_block_layer(self, n_layers, stride, out_channels):
