@@ -1,5 +1,6 @@
 # main file for training
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision
@@ -80,7 +81,6 @@ def test(model, criterion, test_loader):
     # activate eval mode
     model.eval()
 
-    test_loss = 0
     correct = 0
     total = 0
 
@@ -119,13 +119,28 @@ def load_cifar10_dataset():
 
     train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
 
-    train_data.data = train_data.data[:200]
+    train_data.data = train_data.data[:10000]
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=2)
 
     test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
     test_loader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
 
     return train_loader, test_loader
+
+
+def plot_learning_curve_and_acc(train_cost, test_cost, test_acc):
+    # plot learning curve
+    plt.plot(train_cost)
+    plt.plot(test_cost)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend(['Train', 'Test'])
+    plt.show()
+
+    plt.plot(test_acc)
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.show()
 
 
 def main():
@@ -150,17 +165,22 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.001)
 
-    loss_train = []
-    loss_test = []
-    for _ in tqdm(range(10)):
-        loss = train(model, criterion, optimizer, train_loader)
-        loss_train.append(loss)
+    loss_train_plot = []
+    loss_test_plot = []
+    acc_test_plot = []
+    for _ in tqdm(range(3)):
+        loss_train = train(model, criterion, optimizer, train_loader)
+        loss_train_plot.append(loss_train)
 
-        loss = test(model, criterion, test_loader)
-        loss_test.append(loss)
+        loss_test, acc_test = test(model, criterion, test_loader)
+        loss_test_plot.append(loss_test)
+        acc_test_plot.append(acc_test)
 
         # anneal learning rate
         scheduler.step()
+
+    """Plot learning curve and accuracy"""
+    plot_learning_curve_and_acc(loss_train_plot, loss_test_plot, acc_test_plot)
 
 
 if __name__ == '__main__':
