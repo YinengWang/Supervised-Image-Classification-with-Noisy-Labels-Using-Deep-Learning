@@ -1,4 +1,5 @@
 # main file for training
+import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision
@@ -53,13 +54,13 @@ def load_cdon_dataset():
 
 
 def train(model, criterion, optimizer, train_loader):
-    train_loss = 0
-    correct = 0
-    total = 0
+    loss_batch = []
+
     # activate train mode
     model.train()
 
     for batch_idx, (inputs, targets) in enumerate(train_loader):
+        # to(device) copies data from CPU to GPU
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
@@ -67,10 +68,10 @@ def train(model, criterion, optimizer, train_loader):
         loss.backward()
         optimizer.step()
 
-        train_loss += loss.item()
-        _, predicted = outputs.max(1)
-        total += targets.size(0)
-        correct += predicted.eq(targets).sum().item()
+        # loss is a Tensor, therefore:
+        loss_batch.append(loss.item())
+
+    return np.sum(loss_batch)
 
 
 def evaluate(model, criterion, test_loader):
@@ -85,11 +86,39 @@ def evaluate(model, criterion, test_loader):
             loss = criterion(outputs, targets)
 
             test_loss += loss.item()
+
+            # outputs is 100x10 (batch_size x n_classes)
+            # max value, axis=1
+            # returns max value of each column and the index
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
     print(test_loss)
+
+
+def load_cifar10_dataset():
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+
+    train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+
+    train_data.data = train_data.data[:200]
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=2)
+
+    test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
+
+    return train_loader, test_loader
 
 
 def main():
@@ -107,32 +136,19 @@ def main():
     """Prepare data"""
     # classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     print('==> Preparing data..')
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=2)
-
-    test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
+    train_loader, test_loader = load_cifar10_dataset()
 
     """training for 10 epochs"""
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.001)
 
+    loss_train = []
     for _ in tqdm(range(10)):
-        train(model, criterion, optimizer, train_loader)
+        loss = train(model, criterion, optimizer, train_loader)
+        loss_train.append(loss)
         evaluate(model, criterion, test_loader)
+        # anneal learning rate
         scheduler.step()
 
 
