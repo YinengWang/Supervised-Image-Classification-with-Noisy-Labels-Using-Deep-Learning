@@ -66,7 +66,6 @@ for file in csv_files:
                     thumb_url = row[Tags.THUMBNAIL.value]
                     
                     answer = requests.get(thumb_url, headers=headers) #download thumbnail
-                    print("received answer")
                     if answer.status_code != 404:
                         image = answer.content
                         #todo: resize image
