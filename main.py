@@ -74,18 +74,23 @@ def train(model, criterion, optimizer, train_loader):
     return np.sum(loss_batch)
 
 
-def evaluate(model, criterion, test_loader):
+def test(model, criterion, test_loader):
+    loss_batch = []
+
+    # activate eval mode
     model.eval()
+
     test_loss = 0
     correct = 0
     total = 0
+
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(test_loader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 
-            test_loss += loss.item()
+            loss_batch.append(loss.item())
 
             # outputs is 100x10 (batch_size x n_classes)
             # max value, axis=1
@@ -94,7 +99,9 @@ def evaluate(model, criterion, test_loader):
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
-    print(test_loss)
+    acc = correct / total
+    loss = np.sum(loss_batch)
+    return loss, acc
 
 
 def load_cifar10_dataset():
@@ -144,10 +151,14 @@ def main():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.001)
 
     loss_train = []
+    loss_test = []
     for _ in tqdm(range(10)):
         loss = train(model, criterion, optimizer, train_loader)
         loss_train.append(loss)
-        evaluate(model, criterion, test_loader)
+
+        loss = test(model, criterion, test_loader)
+        loss_test.append(loss)
+
         # anneal learning rate
         scheduler.step()
 
