@@ -26,7 +26,6 @@ torch.cuda.manual_seed(SEED)
 
 
 def load_cdon_dataset():
-
     # Data
     print('==> Preparing CDON data..')
 
@@ -59,28 +58,60 @@ def load_cdon_dataset():
     return train_loader
 
 
-def train(model, criterion, optimizer, train_loader, noise_rate=0):
+def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None, scheduler=None, noise_rate=0):
+    train_noise_generator = Noise(train_loader, noise_rate=noise_rate)
+    test_noise_generator = Noise(test_loader, noise_rate=noise_rate) if test_loader is not None else None
 
-    loss_batch = []
+    train_loss_per_epoch = []
+    test_loss_per_epoch = []
+    acc_per_epoch = []
+    memorized_per_epoch = []
 
-    # activate train mode
-    model.train()
-    noise_generator = Noise(train_loader, noise_rate=noise_rate)
+    for _ in tqdm(range(n_epochs)):
+        # activate train mode
+        model.train()
+        train_loss = 0
+        for batch_idx, (inputs, targets) in enumerate(train_loader):
+            targets_with_noise = train_noise_generator.symmetric_noise(targets, batch_idx)
+            # to(device) copies data from CPU to GPU
+            inputs, targets = inputs.to(device), targets_with_noise.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+        train_loss_per_epoch.append(train_loss)
 
-    for batch_idx, (inputs, targets) in enumerate(train_loader):
-        targets_with_noise = noise_generator.symmetric_noise(targets, batch_idx)
-        # to(device) copies data from CPU to GPU
-        inputs, targets = inputs.to(device), targets_with_noise.to(device)
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
+        if test_loader is not None:
+            model.eval()
+            test_loss = 0
+            with torch.no_grad():
+                correct, memorized, total = 0, 0, 0
+                with torch.no_grad():
+                    for batch_idx, (inputs, targets) in enumerate(test_loader):
+                        original_targets = targets.to(device)
+                        targets_with_noise = test_noise_generator.symmetric_noise(targets, batch_idx)
+                        inputs, targets = inputs.to(device), targets_with_noise.to(device)
+                        outputs = model(inputs)
+                        loss = criterion(outputs, targets)
 
-        # loss is a Tensor, therefore:
-        loss_batch.append(loss.item())
+                        _, predicted = outputs.max(1)
+                        total += targets.size(0)
+                        correct += predicted.eq(original_targets).sum().item()
+                        memorized += ((predicted != original_targets) & (predicted == targets)).sum().item()
+                        test_loss += loss.item()
 
-    return np.sum(loss_batch)
+                acc = correct / total
+                memorized_rate = memorized / total
+                test_loss_per_epoch.append(test_loss)
+                acc_per_epoch.append(acc)
+                memorized_per_epoch.append(memorized_rate)
+
+        # anneal learning rate
+        scheduler.step()
+
+    return train_loss_per_epoch, test_loss_per_epoch, acc_per_epoch, memorized_per_epoch
 
 
 def test(model, criterion, test_loader, noise_rate=0):
@@ -137,7 +168,30 @@ def load_cifar10_dataset():
     return train_loader, test_loader
 
 
-def plot_learning_curve_and_acc(train_cost, test_cost, test_acc):
+def load_cifar100_dataset():
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+    ])
+
+    train_data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
+
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=2)
+
+    test_data = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
+
+    return train_loader, test_loader
+
+
+def plot_learning_curve_and_acc(train_cost, test_cost, test_acc, test_memorized):
     # plot learning curve
     plt.plot(train_cost)
     plt.plot(test_cost)
@@ -147,8 +201,10 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_acc):
     plt.show()
 
     plt.plot(test_acc)
+    plt.plot(test_memorized)
     plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+    plt.ylabel('Ratio')
+    plt.legend(['Accuracy', 'Memorized'])
     plt.show()
 
 
@@ -167,29 +223,23 @@ def main():
     """Prepare data"""
     # classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     print('==> Preparing data..')
-    train_loader, test_loader = load_cifar10_dataset()
+    # train_loader, test_loader = load_cifar10_dataset()
+    train_loader, test_loader = load_cifar100_dataset()
 
     """training for 10 epochs"""
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.001)
 
-    loss_train_plot = []
-    loss_test_plot = []
-    acc_test_plot = []
-    for _ in tqdm(range(3)):
-        loss_train = train(model, criterion, optimizer, train_loader)
-        loss_train_plot.append(loss_train)
-
-        loss_test, acc_test = test(model, criterion, test_loader)
-        loss_test_plot.append(loss_test)
-        acc_test_plot.append(acc_test)
-
-        # anneal learning rate
-        scheduler.step()
+    train_loss_per_epoch, test_loss_per_epoch, acc_per_epoch, memorized_per_epoch = train(
+        model, criterion, optimizer, n_epochs=100,
+        train_loader=train_loader, test_loader=test_loader, scheduler=scheduler,
+        noise_rate=0.1)
 
     """Plot learning curve and accuracy"""
-    plot_learning_curve_and_acc(loss_train_plot, loss_test_plot, acc_test_plot)
+    print(f'acc={acc_per_epoch[-1]}, memorized={memorized_per_epoch[-1]}')
+    plot_learning_curve_and_acc(train_loss_per_epoch, test_loss_per_epoch, acc_per_epoch, memorized_per_epoch)
+    torch.save(model.state_dict(), './models/ResNet18_sym_noise_10.mdl')
 
 
 if __name__ == '__main__':

@@ -4,12 +4,15 @@ from math import ceil
 
 
 class Noise(object):
-    def __init__(self, data_loader, noise_rate=0):
+    def __init__(self, data_loader, noise_rate=0, seed=None):
+        if noise_rate < 0 or noise_rate >= 1:
+            raise ValueError('The rate of noisy labels should be between 0 and 1')
+        if seed is not None:
+            np.random.seed(seed)
+
         num_samples = len(data_loader.dataset)
         self.num_classes = len(data_loader.dataset.classes)
         batch_size = data_loader.batch_size
-        if noise_rate < 0 or noise_rate >= 1:
-            raise ValueError('The rate of noisy labels should be between 0 and 1')
         self.noise_rate = noise_rate
         num_batches = ceil(num_samples / batch_size)
         num_noisy_labels = ceil(num_samples * noise_rate)
