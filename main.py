@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision
-from torchvision import transforms, utils
+from torchvision import transforms
 import torch.optim as optim
 from tqdm import tqdm
 
 from Custom_dataset import CDONdataset
 from model import ResNet18
+from noise import Noise
 
 # set global env variable
 if torch.cuda.is_available():
@@ -18,6 +19,10 @@ if torch.cuda.is_available():
 else:
     print('No GPU!')
     device = 'cpu'
+
+SEED = 2021
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
 
 
 def load_cdon_dataset():
@@ -54,15 +59,18 @@ def load_cdon_dataset():
     return train_loader
 
 
-def train(model, criterion, optimizer, train_loader):
+def train(model, criterion, optimizer, train_loader, noise_rate=0):
+
     loss_batch = []
 
     # activate train mode
     model.train()
+    noise_generator = Noise(train_loader, noise_rate=noise_rate)
 
     for batch_idx, (inputs, targets) in enumerate(train_loader):
+        targets_with_noise = noise_generator.symmetric_noise(targets, batch_idx)
         # to(device) copies data from CPU to GPU
-        inputs, targets = inputs.to(device), targets.to(device)
+        inputs, targets = inputs.to(device), targets_with_noise.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
         loss = criterion(outputs, targets)
@@ -75,18 +83,20 @@ def train(model, criterion, optimizer, train_loader):
     return np.sum(loss_batch)
 
 
-def test(model, criterion, test_loader):
+def test(model, criterion, test_loader, noise_rate=0):
     loss_batch = []
 
     # activate eval mode
     model.eval()
+    noise_generator = Noise(test_loader, noise_rate=noise_rate)
 
     correct = 0
     total = 0
 
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(test_loader):
-            inputs, targets = inputs.to(device), targets.to(device)
+            targets_with_noise = noise_generator.symmetric_noise(targets, batch_idx)
+            inputs, targets = inputs.to(device), targets_with_noise.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 
