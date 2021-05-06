@@ -1,6 +1,24 @@
 """
     This is a script that takes data from the CSVs, download and stores the images.
     It assumes the csv has the following columns: name, thumbnail link, date, img link, subcategory id, subcategory
+
+    The final dataset is stored in the final_filename{i} files according to CIFAR semantics:
+
+    The archive contains the files dataset1, dataset2, ... Each of these files is a Python "pickled" object produced with Pickle. 
+    Here is a python3 routine which will open such a file and return a dictionary:
+
+    def unpickle(file):
+        import pickle
+        with open(file, 'rb') as fo:
+            dict = pickle.load(fo, encoding='bytes')
+        return dict
+    
+    Loaded in this way, each of the batch files contains a dictionary with the following elements:
+    data -- a 10000x7500 numpy array of uint8s. Each row of the array stores a 50x50 colour image. The first 2500 entries contain the red channel values, the next 2500 the green, and the final 2500 the blue.
+    The image is stored in row-major order, so that the first 50 entries of the array are the red channel values of the first row of the image.
+    labels -- a list of 10000 numbers in the range 0-20. The number at index i indicates the label of the ith image in the array data.
+
+    Dependencies: Pillow, Pickle, numpy, requests
 """
 
 from os import listdir
