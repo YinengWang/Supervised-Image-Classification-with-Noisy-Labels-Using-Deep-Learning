@@ -12,8 +12,6 @@ import xml.etree.ElementTree as ET
 import csv
 import os.path
 
-total_items = 0.0
-
 files = listdir("./dataset")
 
 #files are in the dataset folder
