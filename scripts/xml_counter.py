@@ -8,12 +8,10 @@ import lxml.etree
 
 total_items = 0.0
 
-
 files = listdir("./dataset")
 
-#files are in the dataset folder
+# files are in the dataset folder
 for file in files:
-
     print("Parsing " + file)
 
     doc = lxml.etree.parse("./dataset/" + file)

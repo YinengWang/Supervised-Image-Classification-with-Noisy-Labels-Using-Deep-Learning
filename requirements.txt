@@ -4,3 +4,4 @@ tqdm
 pandas
 scikit-image
 scipy
+lxml
