@@ -1,15 +1,23 @@
+""""
+    This is a short script to count the products in the dataset folder
+"""
+
 from xml.dom import minidom
 from os import listdir
 import lxml.etree
 
-total_items = 0
+total_items = 0.0
 
-#files are in the dataset folder
-for file in listdir("./dataset"):
+files = listdir("./dataset")
+
+# files are in the dataset folder
+for file in files:
+    print("Parsing " + file)
+
     doc = lxml.etree.parse("./dataset/" + file)
-    total_items += int(doc.xpath('count(//product)'))
+    count = doc.xpath('count(//product)')
+    total_items += count
+    del doc
+    del count
     print(total_items)
-
-    #code not optimized
-#     mydoc = minidom.parse("./dataset/" + file)
-#     total_items += len(mydoc.getElementsByTagName('product'))
+    print("\n")
