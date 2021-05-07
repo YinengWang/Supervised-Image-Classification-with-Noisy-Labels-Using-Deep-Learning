@@ -43,8 +43,8 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
-            train_loss += loss.item()
-        train_loss_per_epoch.append(train_loss)
+            train_loss += loss.item() * targets.size(0)
+        train_loss_per_epoch.append(train_loss / len(train_loader.dataset))
 
         if test_loader is not None:
             model.eval()
@@ -67,9 +67,9 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                         correct += correct_idx.sum().item()
                         memorized += memorized_idx.sum().item()
                         incorrect += incorrect_idx.sum().item()
-                        test_loss += loss.item()
+                        test_loss += loss.item() * targets.size(0)
 
-                test_loss_per_epoch.append(test_loss)
+                test_loss_per_epoch.append(test_loss / total)
                 correct_per_epoch.append(correct / total)
                 memorized_per_epoch.append(memorized / total)
                 incorrect_per_epoch.append(incorrect / total)
@@ -97,7 +97,7 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memori
     plt.title(title)
     plt.xlabel('Epoch')
     plt.ylabel('Fraction of examples')
-    plt.legend(['Accuracy', 'Memorized', 'Incorrect'])
+    plt.legend(['Correct', 'Memorized', 'Incorrect'])
     plt.show()
 
 
@@ -138,10 +138,10 @@ def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/
 
 
 def main():
-    train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0, model_path='./models/CIFAR10_noise_level_0.mdl')
-    train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
-    # train_CIFAR(CIFAR10=False, n_epochs=50, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
-    # train_CIFAR(CIFAR10=False, n_epochs=50, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
+    # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0, model_path='./models/CIFAR10_noise_level_0.mdl')
+    # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
+    train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
+    train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
 
 
 if __name__ == '__main__':
