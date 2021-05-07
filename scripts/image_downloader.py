@@ -100,7 +100,7 @@ final_filename = "dataset"
 date_accepted = 2010 #date from which to collect samples
 
 collected_samples = 0
-FINAL_DATASET_PATH = lambda: DATASET_DIR + final_filename + int(collected_samples / samples4file) #get dataset path
+FINAL_DATASET_PATH = lambda: f'{DATASET_DIR}{final_filename}{np.ceil(collected_samples / samples4file)}' #get dataset path
 
 for file in all_files:
     if not file.endswith(".csv"):
@@ -116,7 +116,7 @@ headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:59.0) Geck
 
 workers = []
 
-#files are in the dataset folder
+#files are in the dataset folder1
 for file in reversed(csv_files):
     worker = threading.Thread(target=download_file_images, args=(file, data, labels, threading.RLock(), ))
     worker.start()
@@ -124,4 +124,3 @@ for file in reversed(csv_files):
 
 for thread in workers:
     thread.join()
-    
