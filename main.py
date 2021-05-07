@@ -1,15 +1,15 @@
 # main file for training
-import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from torch.utils.data import Dataset, DataLoader
-import torchvision
-from torchvision import transforms, utils
 import torch.optim as optim
 from tqdm import tqdm
 
-from Custom_dataset import CDONdataset
 from model import ResNet18
+from noise import Noise
+import datasets
+
+from pathlib import Path
+
 
 # set global env variable
 if torch.cuda.is_available():
@@ -20,166 +20,128 @@ else:
     device = 'cpu'
 
 
-def load_cdon_dataset():
+def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None, scheduler=None, noise_rate=0.0):
+    train_noise_generator = Noise(train_loader, noise_rate=noise_rate)
+    test_noise_generator = Noise(test_loader, noise_rate=noise_rate) if test_loader is not None else None
 
-    # Data
-    print('==> Preparing CDON data..')
+    train_loss_per_epoch = []
+    test_loss_per_epoch = []
+    correct_per_epoch = []
+    incorrect_per_epoch = []
+    memorized_per_epoch = []
 
-    transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize(32),
-            transforms.CenterCrop(32),
-            transforms.ToTensor()
-        ])
-
-    rootFolder = "/tmp/pycharm_project_alfred/Datasets/Test_data"
-    dataset = CDONdataset("test_data.csv", rootFolder, transform=transform)
-    # train_set, test_set = torch.utils.data.random_split(dataset, [1, 1])
-    train_loader = DataLoader(dataset=dataset, batch_size=2, shuffle=False)
-
-    #
-    # for train_images, train_labels in train_loader:
-    #     print(train_images.shape)
-    #     print(train_labels)
-    #     image = train_images.permute(2, 3, 1, 0)[:, :, :, 0]
-    #     plt.imshow(image)
-    #     plt.savefig("Results/test.jpg")
-    #     plt.show()
-    #
-    #     image = train_images.permute(2, 3, 1, 0)[:, :, :, 1]
-    #     plt.imshow(image)
-    #     plt.show()
-    #     plt.savefig("Results/test2.jpg")
-
-    return train_loader
-
-
-def train(model, criterion, optimizer, train_loader):
-    loss_batch = []
-
-    # activate train mode
-    model.train()
-
-    for batch_idx, (inputs, targets) in enumerate(train_loader):
-        # to(device) copies data from CPU to GPU
-        inputs, targets = inputs.to(device), targets.to(device)
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
-
-        # loss is a Tensor, therefore:
-        loss_batch.append(loss.item())
-
-    return np.sum(loss_batch)
-
-
-def test(model, criterion, test_loader):
-    loss_batch = []
-
-    # activate eval mode
-    model.eval()
-
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(test_loader):
-            inputs, targets = inputs.to(device), targets.to(device)
+    for _ in tqdm(range(n_epochs)):
+        # activate train mode
+        model.train()
+        train_loss = 0
+        for batch_idx, (inputs, targets) in enumerate(train_loader):
+            targets_with_noise = train_noise_generator.symmetric_noise(targets, batch_idx)
+            # to(device) copies data from CPU to GPU
+            inputs, targets = inputs.to(device), targets_with_noise.to(device)
+            optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item() * targets.size(0)
+        train_loss_per_epoch.append(train_loss / len(train_loader.dataset))
 
-            loss_batch.append(loss.item())
+        if test_loader is not None:
+            model.eval()
+            test_loss = 0
+            with torch.no_grad():
+                correct, incorrect, memorized, total = 0, 0, 0, 0
+                with torch.no_grad():
+                    for batch_idx, (inputs, targets) in enumerate(test_loader):
+                        original_targets = targets.to(device)
+                        targets_with_noise = test_noise_generator.symmetric_noise(targets, batch_idx)
+                        inputs, targets = inputs.to(device), targets_with_noise.to(device)
+                        outputs = model(inputs)
+                        loss = criterion(outputs, targets)
 
-            # outputs is 100x10 (batch_size x n_classes)
-            # max value, axis=1
-            # returns max value of each column and the index
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+                        _, predicted = outputs.max(1)
+                        total += targets.size(0)
+                        correct_idx = predicted.eq(original_targets)
+                        memorized_idx = ((predicted != original_targets) & (predicted == targets))
+                        incorrect_idx = ((predicted != original_targets) & (predicted != targets))
+                        correct += correct_idx.sum().item()
+                        memorized += memorized_idx.sum().item()
+                        incorrect += incorrect_idx.sum().item()
+                        test_loss += loss.item() * targets.size(0)
 
-    acc = correct / total
-    loss = np.sum(loss_batch)
-    return loss, acc
+                test_loss_per_epoch.append(test_loss / total)
+                correct_per_epoch.append(correct / total)
+                memorized_per_epoch.append(memorized / total)
+                incorrect_per_epoch.append(incorrect / total)
 
+        # anneal learning rate
+        scheduler.step()
 
-def load_cifar10_dataset():
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-
-    train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=2)
-
-    test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
-
-    return train_loader, test_loader
+    return (train_loss_per_epoch, test_loss_per_epoch,
+            correct_per_epoch, memorized_per_epoch, incorrect_per_epoch,)
 
 
-def plot_learning_curve_and_acc(train_cost, test_cost, test_acc):
+def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memorized, test_incorrect, title):
     # plot learning curve
     plt.plot(train_cost)
     plt.plot(test_cost)
+    plt.title(title)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend(['Train', 'Test'])
     plt.show()
 
-    plt.plot(test_acc)
+    plt.plot(test_correct)
+    plt.plot(test_memorized)
+    plt.plot(test_incorrect)
+    plt.title(title)
     plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+    plt.ylabel('Fraction of examples')
+    plt.legend(['Correct', 'Memorized', 'Incorrect'])
     plt.show()
 
 
-def main():
-    # Temp commented for CIFAR-10
-    # train_loader = load_cdon_dataset()
-    # x = None
-    # for train_images, train_labels in train_loader:
-    #     print(train_images.shape)
-    #     print(train_labels)
-    #     x = train_images
-
+def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/CIFAR.mdl'):
+    output_features = 10 if CIFAR10 else 100
+    dataset_name = 'CIFAR10' if CIFAR10 else 'CIFAR100'
     layers_in_each_block_list = [2, 2, 2, 2]
-    model = ResNet18(layers_in_each_block_list).to(device)
+    model = ResNet18(layers_in_each_block_list, output_features).to(device)
 
     """Prepare data"""
-    # classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
     print('==> Preparing data..')
-    train_loader, test_loader = load_cifar10_dataset()
+    if CIFAR10:
+        train_loader, test_loader = datasets.load_cifar10_dataset()
+    else:
+        train_loader, test_loader = datasets.load_cifar100_dataset()
 
     """training for 10 epochs"""
+    print(f'==> Start training {dataset_name} '
+          f'with noise level {noise_rate} '
+          f'for {n_epochs} epochs')
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.001)
 
-    loss_train_plot = []
-    loss_test_plot = []
-    acc_test_plot = []
-    for _ in tqdm(range(3)):
-        loss_train = train(model, criterion, optimizer, train_loader)
-        loss_train_plot.append(loss_train)
-
-        loss_test, acc_test = test(model, criterion, test_loader)
-        loss_test_plot.append(loss_test)
-        acc_test_plot.append(acc_test)
-
-        # anneal learning rate
-        scheduler.step()
+    (train_loss_per_epoch, test_loss_per_epoch,
+     correct_per_epoch, memorized_per_epoch, incorrect_per_epoch) = train(
+        model, criterion, optimizer, n_epochs=n_epochs,
+        train_loader=train_loader, test_loader=test_loader, scheduler=scheduler,
+        noise_rate=noise_rate)
 
     """Plot learning curve and accuracy"""
-    plot_learning_curve_and_acc(loss_train_plot, loss_test_plot, acc_test_plot)
+    print(f'acc={correct_per_epoch[-1]}, memorized={memorized_per_epoch[-1]}')
+    plot_title = f'{dataset_name}, noise_level={noise_rate}'
+    plot_learning_curve_and_acc(train_loss_per_epoch, test_loss_per_epoch,
+                                correct_per_epoch, memorized_per_epoch, incorrect_per_epoch, plot_title)
+    Path("./models").mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), model_path)
+
+
+def main():
+    # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0, model_path='./models/CIFAR10_noise_level_0.mdl')
+    # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
+    train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
+    train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
 
 
 if __name__ == '__main__':
