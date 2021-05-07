@@ -14,7 +14,7 @@
         return dict
     
     Loaded in this way, each of the batch files contains a dictionary with the following elements:
-    data -- a 10000x7500 numpy array of uint8s. Each row of the array stores a 50x50 colour image. The first 2500 entries contain the red channel values, the next 2500 the green, and the final 2500 the blue.
+    data -- a 10000x7500 numpy array of uint8s. Each row of the array stores a 80x80 colour image. The first 2500 entries contain the red channel values, the next 2500 the green, and the final 2500 the blue.
     The image is stored in row-major order, so that the first 50 entries of the array are the red channel values of the first row of the image.
     labels -- a list of 10000 numbers in the range 0-20. The number at index i indicates the label of the ith image in the array data.
 
@@ -62,7 +62,6 @@ def download_file_images(file, data, labels, lock: threading.RLock):
                             # image.save(thumb_url.split("/")[-1]) #was used to make sure the images are stored correctly
                             image_size = (max(image.size), max(image.size))
                             image = ImageOps.pad(image, image_size, color="white")
-                            image.save(thumb_url.split("/")[-1]) #was used to make sure the images are stored correctly
                             image = np.array(image)
                             #store resized image
                             with lock:
