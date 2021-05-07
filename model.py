@@ -5,7 +5,7 @@ from conv_block import ConvBlock
 
 
 class ResNet18(nn.Module):
-    def __init__(self, layers_in_each_block_list):
+    def __init__(self, layers_in_each_block_list, num_classes):
         super().__init__()
         self.in_channels = 64
         self.conv_1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
@@ -23,7 +23,7 @@ class ResNet18(nn.Module):
         self.residual_block_4 = self.add_block_layer(out_channels=512,
                                                      n_layers=layers_in_each_block_list[3],
                                                      stride=2)
-        self.output = nn.Linear(in_features=512, out_features=10)
+        self.output = nn.Linear(in_features=512, out_features=num_classes)
 
     def add_block_layer(self, n_layers, stride, out_channels):
         # stride_for_each_layer_list = [stride] concatonated with [1, 1, .....]

@@ -4,7 +4,7 @@ from math import ceil
 
 
 class Noise(object):
-    def __init__(self, data_loader, noise_rate=0, seed=None):
+    def __init__(self, data_loader, noise_rate=0.0, seed=None):
         if noise_rate < 0 or noise_rate >= 1:
             raise ValueError('The rate of noisy labels should be between 0 and 1')
         if seed is not None:
@@ -22,7 +22,7 @@ class Noise(object):
             self.noisy_label_idx_per_batch[idx // batch_size].append(idx % batch_size)
 
     def symmetric_noise(self, targets, batch_idx):
-        if self.noise_rate == 0:
+        if self.noise_rate == 0.0:
             return targets
         targets_with_noise = targets.clone().detach()
         for idx in self.noisy_label_idx_per_batch[batch_idx]:
