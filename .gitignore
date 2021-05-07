@@ -1,6 +1,9 @@
 .idea
 venv
 
+# Data folder
+data/
+
 # Created by https://www.toptal.com/developers/gitignore/api/macos,pycharm
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,pycharm
 
@@ -137,7 +140,3 @@ fabric.properties
 .idea/codestream.xml
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,pycharm
-
-dataset/
-.vscode
-env
