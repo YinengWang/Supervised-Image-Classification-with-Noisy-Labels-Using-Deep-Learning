@@ -31,7 +31,7 @@ import io
 import PIL.Image as Image
 import PIL.ImageOps as ImageOps
 import threading
-
+from time import sleep
 class Tags(Enum):
     NAME = 0
     THUMBNAIL = 1
@@ -40,7 +40,7 @@ class Tags(Enum):
     SUB_ID = 4
     SUB = 5
 
-def download_file_images(file, data, labels, lock: threading.RLock, image_size):
+def download_file_images(file, data, labels, lock: threading.RLock):
     global collected_samples
     csv_filename = DATASET_DIR + file
     with open(csv_filename, 'r', newline='') as csvfile:
@@ -53,30 +53,37 @@ def download_file_images(file, data, labels, lock: threading.RLock, image_size):
                 #check date
                 if not date or int(date.split("-")[0]) > date_accepted:
                     thumb_url = row[Tags.THUMBNAIL.value]
-                    
-                    answer = requests.get(thumb_url, headers=headers) #download thumbnail
-                    if answer.status_code != 404:
-                        image = answer.content
-                        #resize image
-                        image = Image.open(io.BytesIO(image))
-                        image = ImageOps.pad(image, image_size)
-                        image = np.array(image)
-                        #store resized image
-                        with lock:
-                            data.append(image)
-                            labels.append(categories[GET_CATEGORY(file)])
-                            collected_samples += 1
+                    try:
+                        answer = requests.get(thumb_url, headers=headers) #download thumbnail
+                        if answer.status_code <= 400:
+                            image = answer.content
+                            #resize image
+                            image = Image.open(io.BytesIO(image))
+                            # image.save(thumb_url.split("/")[-1]) #was used to make sure the images are stored correctly
+                            image_size = (max(image.size), max(image.size))
+                            image = ImageOps.pad(image, image_size, color="white")
+                            image.save(thumb_url.split("/")[-1]) #was used to make sure the images are stored correctly
+                            image = np.array(image)
+                            #store resized image
+                            with lock:
+                                data.append(image)
+                                labels.append(categories[GET_CATEGORY(file)])
+                                collected_samples += 1
 
-                            #check if collected enough samples
-                            if collected_samples % samples4file == 0:
-                                with open(FINAL_DATASET_PATH(), "w") as data_file:
-                                    dict2write = {"data": np.array(data), "labels": np.array(labels)}
-                                    pickle.dump(dict2write, data_file, protocol=pickle.HIGHEST_PROTOCOL)
-                                data.clear()
-                                labels.clear()
-                            if collected_samples % 100 == 0:
-                                print(f'Collected {collected_samples} samples')
-
+                                #check if collected enough samples
+                                if collected_samples % samples4file == 0:
+                                    with open(FINAL_DATASET_PATH(), "w") as data_file:
+                                        dict2write = {"data": np.array(data), "labels": np.array(labels)}
+                                        pickle.dump(dict2write, data_file, protocol=pickle.HIGHEST_PROTOCOL)
+                                    data.clear()
+                                    labels.clear()
+                                if collected_samples % 100 == 0:
+                                    print(f'Collected {collected_samples} samples')
+                        else:
+                            print(f"Received a non-success code: {answer.status_code}")
+                            sleep(10)
+                    except Exception as e:
+                        print(f'Caught the following exception: {e}')
 
 GET_CATEGORY = lambda x: x.split("_")[0] #get the category from the filename
 DATASET_DIR = "./dataset/"
@@ -92,7 +99,6 @@ percentage2download = 10 #10%
 samples4file = 10000 #how many samples to store per file
 final_filename = "dataset"
 date_accepted = 2010 #date from which to collect samples
-IMAGE_SIZE = (50, 50) #the size of the final image
 
 collected_samples = 0
 FINAL_DATASET_PATH = lambda: DATASET_DIR + final_filename + int(collected_samples / samples4file) #get dataset path
@@ -113,7 +119,7 @@ workers = []
 
 #files are in the dataset folder
 for file in reversed(csv_files):
-    worker = threading.Thread(target=download_file_images, args=(file, data, labels, threading.RLock(), IMAGE_SIZE, ))
+    worker = threading.Thread(target=download_file_images, args=(file, data, labels, threading.RLock(), ))
     worker.start()
     workers.append(worker)
 
