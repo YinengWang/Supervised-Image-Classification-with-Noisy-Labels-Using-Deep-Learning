@@ -76,10 +76,12 @@ def download_file_images(file, data, labels, lock: threading.RLock):
                                 if collected_samples % 100 == 0:
                                     print(f'Collected {collected_samples} samples')
                         else:
-                            print(f"Received a non-success code: {answer.status_code}")
+                            print(f"Received a non-success code {answer.status_code} when crawling:")
+                            print(thumb_url)
                             sleep(10)
                     except Exception as e:
-                        print(f'Caught the following exception: {e}')
+                        print(f'Caught the following exception: {e} when crawling:')
+                        print(thumb_url)
 
 
 GET_CATEGORY = lambda x: x.split("_")[0]  # get the category from the filename
