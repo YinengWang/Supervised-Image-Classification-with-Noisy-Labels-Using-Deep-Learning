@@ -32,6 +32,8 @@ import PIL.Image as Image
 import PIL.ImageOps as ImageOps
 import threading
 from time import sleep
+
+
 class Tags(Enum):
     NAME = 0
     THUMBNAIL = 1
@@ -40,36 +42,37 @@ class Tags(Enum):
     SUB_ID = 4
     SUB = 5
 
+
 def download_file_images(file, data, labels, lock: threading.RLock):
     global collected_samples
     csv_filename = DATASET_DIR + file
     with open(csv_filename, 'r', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
-        #read each line
+        # read each line
         for index, row in enumerate(reader):
-            #take one in ten
+            # take one in ten
             if index % (100 / percentage2download) == 0:
                 date = row[Tags.DATE.value]
-                #check date
+                # check date
                 if not date or int(date.split("-")[0]) > date_accepted:
                     thumb_url = row[Tags.THUMBNAIL.value]
                     try:
-                        answer = requests.get(thumb_url, headers=headers) #download thumbnail
+                        answer = requests.get(thumb_url, headers=headers)  # download thumbnail
                         if answer.status_code <= 400:
                             image = answer.content
-                            #resize image
+                            # resize image
                             image = Image.open(io.BytesIO(image))
                             # image.save(thumb_url.split("/")[-1]) #was used to make sure the images are stored correctly
                             image_size = (max(image.size), max(image.size))
                             image = ImageOps.pad(image, image_size, color="white")
                             image = np.array(image)
-                            #store resized image
+                            # store resized image
                             with lock:
                                 data.append(image)
                                 labels.append(categories[GET_CATEGORY(file)])
                                 collected_samples += 1
 
-                                #check if collected enough samples
+                                # check if collected enough samples
                                 if collected_samples % samples4file == 0:
                                     with open(FINAL_DATASET_PATH(), "w") as data_file:
                                         dict2write = {"data": np.array(data), "labels": np.array(labels)}
@@ -84,23 +87,23 @@ def download_file_images(file, data, labels, lock: threading.RLock):
                     except Exception as e:
                         print(f'Caught the following exception: {e}')
 
-GET_CATEGORY = lambda x: x.split("_")[0] #get the category from the filename
-DATASET_DIR = "./dataset/"
 
+GET_CATEGORY = lambda x: x.split("_")[0]  # get the category from the filename
+DATASET_DIR = "./dataset/"
 
 all_files = listdir(DATASET_DIR)
 all_files.sort()
 csv_files = []
 categories = {}
 
-#IMPORTANT PARAMETERS
-percentage2download = 10 #10%
-samples4file = 10000 #how many samples to store per file
+# IMPORTANT PARAMETERS
+percentage2download = 10  # 10%
+samples4file = 10000  # how many samples to store per file
 final_filename = "dataset"
-date_accepted = 2010 #date from which to collect samples
+date_accepted = 2010  # date from which to collect samples
 
 collected_samples = 0
-FINAL_DATASET_PATH = lambda: DATASET_DIR + final_filename + int(collected_samples / samples4file) #get dataset path
+FINAL_DATASET_PATH = lambda: DATASET_DIR + final_filename + int(collected_samples / samples4file)  # get dataset path
 
 for file in all_files:
     if not file.endswith(".csv"):
@@ -111,17 +114,17 @@ for file in all_files:
 
 data = []
 labels = []
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:59.0) Gecko/20100101 Firefox/59.0'} #needed, otherwise the request hangs
-#todo: is there a workaround??
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:59.0) Gecko/20100101 Firefox/59.0'}  # needed, otherwise the request hangs
+# todo: is there a workaround??
 
 workers = []
 
-#files are in the dataset folder
+# files are in the dataset folder
 for file in reversed(csv_files):
-    worker = threading.Thread(target=download_file_images, args=(file, data, labels, threading.RLock(), ))
+    worker = threading.Thread(target=download_file_images, args=(file, data, labels, threading.RLock(),))
     worker.start()
     workers.append(worker)
 
 for thread in workers:
     thread.join()
-    

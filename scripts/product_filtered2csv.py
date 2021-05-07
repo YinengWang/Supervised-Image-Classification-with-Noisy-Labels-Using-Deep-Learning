@@ -14,7 +14,7 @@ import os.path
 
 files = listdir("./dataset")
 
-#files are in the dataset folder
+# files are in the dataset folder
 for file in files:
     if not file.endswith(".xml"):
         continue
@@ -22,15 +22,15 @@ for file in files:
     csv_filename = "./dataset/" + file[5: len(file) - 3] + "csv"
 
     if os.path.isfile(csv_filename):
-       print("csv file for " + file + " already exists, skipping this one") 
-       continue
+        print("csv file for " + file + " already exists, skipping this one")
+        continue
 
     with open(csv_filename, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile, delimiter=',')
         inside_product_tag = False
-        product_is_good = True #checks if product is still sold and should be stored
+        product_is_good = True  # checks if product is still sold and should be stored
 
-        #tags to store
+        # tags to store
         tags = ['title', 'thumbnail', 'release_date', 'big_image', 'catid', 'category']
         row = {}
         for tag in tags:
@@ -49,12 +49,12 @@ for file in files:
                     product_is_good = True
 
             elif elem.tag == 'link' and elem.text == "https://cdon.se/":
-                product_is_good = False 
+                product_is_good = False
             if event == "start":
                 for tag in tags:
                     if elem.tag == tag:
                         row[tag] = elem.text
                 if elem.tag == "thumbnail" and not elem.text:
                     product_is_good = False
-        
+
         del iter
