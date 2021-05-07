@@ -29,7 +29,6 @@ import numpy as np
 import pickle
 import io
 import PIL.Image as Image
-import PIL.ImageOps as ImageOps
 import threading
 from time import sleep
 
@@ -60,13 +59,8 @@ def download_file_images(file, data, labels, lock: threading.RLock):
                         answer = requests.get(thumb_url, headers=headers)  # download thumbnail
                         if answer.status_code <= 400:
                             image = answer.content
-                            # resize image
-                            image = Image.open(io.BytesIO(image))
+                            image = np.array(Image.open(io.BytesIO(image)))
                             # image.save(thumb_url.split("/")[-1]) #was used to make sure the images are stored correctly
-                            image_size = (max(image.size), max(image.size))
-                            image = ImageOps.pad(image, image_size, color="white")
-                            image = np.array(image)
-                            # store resized image
                             with lock:
                                 data.append(image)
                                 labels.append(categories[GET_CATEGORY(file)])
@@ -74,8 +68,8 @@ def download_file_images(file, data, labels, lock: threading.RLock):
 
                                 # check if collected enough samples
                                 if collected_samples % samples4file == 0:
-                                    with open(FINAL_DATASET_PATH(), "w") as data_file:
-                                        dict2write = {"data": np.array(data), "labels": np.array(labels)}
+                                    with open(FINAL_DATASET_PATH(), "wb") as data_file:
+                                        dict2write = {"data": np.array(data, dtype=object), "labels": np.array(labels, dtype=object)}
                                         pickle.dump(dict2write, data_file, protocol=pickle.HIGHEST_PROTOCOL)
                                     data.clear()
                                     labels.clear()
@@ -103,7 +97,7 @@ final_filename = "dataset"
 date_accepted = 2010  # date from which to collect samples
 
 collected_samples = 0
-FINAL_DATASET_PATH = lambda: f'{DATASET_DIR}{final_filename}{np.ceil(collected_samples / samples4file)}' # get dataset path
+FINAL_DATASET_PATH = lambda: f'{DATASET_DIR}{final_filename}{int(np.ceil(collected_samples / samples4file))}' # get dataset path
 
 for file in all_files:
     if not file.endswith(".csv"):
@@ -123,7 +117,7 @@ workers = []
 # files are in the dataset folder
 for file in reversed(csv_files):
     worker = threading.Thread(target=download_file_images, args=(file, data, labels, threading.RLock(),))
-    worker.start()
+    worker.start() 
     workers.append(worker)
 
 for thread in workers:
