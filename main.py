@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
+from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from model import ResNet18
@@ -39,10 +40,16 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             # to(device) copies data from CPU to GPU
             inputs, targets = inputs.to(device), targets_with_noise.to(device)
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
+
+            scaler = GradScaler()
+            with autocast():
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
             train_loss += loss.item() * targets.size(0)
         train_loss_per_epoch.append(train_loss / len(train_loader.dataset))
 
@@ -139,9 +146,9 @@ def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/
 
 def main():
     # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0, model_path='./models/CIFAR10_noise_level_0.mdl')
-    # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
-    train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
-    train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
+    train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
+    # train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
+    # train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
 
 
 if __name__ == '__main__':
