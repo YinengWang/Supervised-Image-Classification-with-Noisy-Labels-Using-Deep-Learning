@@ -51,7 +51,6 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             test_loss = 0
             with torch.no_grad():
                 correct, incorrect, memorized, total = 0, 0, 0, 0
-                # CE_correct, CE_memoized, CE_incorrect = 0.0, 0.0, 0.0
                 with torch.no_grad():
                     for batch_idx, (inputs, targets) in enumerate(test_loader):
                         original_targets = targets.to(device)
@@ -100,15 +99,6 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memori
     plt.ylabel('Fraction of examples')
     plt.legend(['Accuracy', 'Memorized', 'Incorrect'])
     plt.show()
-
-    # plt.plot(CE_correct_per_epoch)
-    # plt.plot(CE_memorized_per_epoch)
-    # plt.plot(CE_incorrect_per_epoch)
-    # plt.title(title)
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Cross Entropy')
-    # plt.legend(['Accuracy', 'Memorized', 'Incorrect'])
-    # plt.show()
 
 
 def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/CIFAR.mdl'):
