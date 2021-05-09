@@ -5,8 +5,9 @@ from conv_block import ConvBlock
 
 
 class ResNet18(nn.Module):
-    def __init__(self, layers_in_each_block_list, num_classes):
+    def __init__(self, num_classes, layers_in_each_block_list = [2, 2, 2, 2]):
         super().__init__()
+        layers_in_each_block_list = layers_in_each_block_list
         self.in_channels = 64
         self.conv_1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.batch_norm_1 = nn.BatchNorm2d(64)
@@ -61,3 +62,8 @@ class ResNet18(nn.Module):
         out = self.output(out)
 
         return out
+
+
+class ResNet34(ResNet18):
+    def __init__(self, num_classes):
+        ResNet18.__init__(self, num_classes, layers_in_each_block_list=[3, 4, 6, 3])
