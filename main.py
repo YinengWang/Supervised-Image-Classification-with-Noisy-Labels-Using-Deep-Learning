@@ -6,6 +6,7 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from model import ResNet18
+from model import ResNet34
 from noise import Noise
 import datasets
 
@@ -15,6 +16,7 @@ from pathlib import Path
 # set global env variable
 if torch.cuda.is_available():
     print('GPU is enabled!')
+    print('Using ' + torch.cuda.get_device_name(0))
     device = 'cuda'
 else:
     print('No GPU!')
@@ -111,8 +113,9 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memori
 def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/CIFAR.mdl'):
     output_features = 10 if CIFAR10 else 100
     dataset_name = 'CIFAR10' if CIFAR10 else 'CIFAR100'
-    layers_in_each_block_list = [2, 2, 2, 2]
-    model = ResNet18(layers_in_each_block_list, output_features).to(device)
+
+    # model = ResNet18(output_features).to(device)
+    model = ResNet34(output_features).to(device)
 
     """Prepare data"""
     print('==> Preparing data..')
