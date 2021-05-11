@@ -42,16 +42,10 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             # to(device) copies data from CPU to GPU
             inputs, targets = inputs.to(device), targets_with_noise.to(device)
             optimizer.zero_grad()
-
-            scaler = GradScaler()
-            with autocast():
-                outputs = model(inputs)
-                loss = criterion(outputs, targets)
-
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
             train_loss += loss.item() * targets.size(0)
         train_loss_per_epoch.append(train_loss / len(train_loader.dataset))
 
@@ -129,7 +123,7 @@ def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/
           f'with noise level {noise_rate} '
           f'for {n_epochs} epochs')
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+    optimizer = optim.SGD(model.parameters(), lr=0.02, momentum=0.9, weight_decay=1e-3)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.001)
 
     (train_loss_per_epoch, test_loss_per_epoch,
@@ -149,9 +143,10 @@ def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, model_path='./model/
 
 def main():
     # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0, model_path='./models/CIFAR10_noise_level_0.mdl')
-    train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
+    # train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR10_noise_level_10.mdl')
     # train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
     # train_CIFAR(CIFAR10=False, n_epochs=100, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
+    train_CIFAR(CIFAR10=True, n_epochs=150, noise_rate=0.6, model_path='./models/CIFAR10_noise_level_60.mdl')
 
 
 if __name__ == '__main__':
