@@ -24,29 +24,7 @@ wandb_project = 'dd2424-ResNet-team'
 #wandb_project = 'DD2424-ResNet'
 
 
-config = dict(
-    n_epochs=20,
-    batch_size=128,
-    classes=10,
-    noise_rate=0.2,
-    dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-    model_path='./models/CIFAR10_noise_level_10.mdl',
-    learning_rate=0.02,
-    momentum=0.9,
-    weight_decay=1e-3,
-    milestones=[40, 80],
-    gamma=0.01,
-    enable_amp=True
-)
 
-trainer_config = {
-    'model': ResNet34,
-    'optimizer': optim.SGD,
-    'optimizer_params': {'lr': config['learning_rate'], 'momentum': config['momentum'],
-                         'weight_decay': config['weight_decay']},
-    'scheduler': optim.lr_scheduler.MultiStepLR,
-    'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']}
-}
 # use_CosAnneal = {
 #     'scheduler': optim.lr_scheduler.CosineAnnealingLR,
 #     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
@@ -179,22 +157,39 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memori
     plt.show()
 
 
-def model_pipeline(hyperparameters):
+def model_pipeline(config, trainer_config):
     # tell wandb to get started
-    with wandb.init(project=wandb_project, config=hyperparameters):
-        # access all HPs through wandb.config, so logging matches execution!
+    with wandb.init(project=wandb_project, config=config):
+        # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
 
-        # make the model, data, and optimization problem
-        model, train_loader, test_loader, criterion, optimizer, scheduler = make(config)
-        # print(model)
+        """create the model"""
+        model = trainer_config['model'](config['classes']).to(device)
+
+        if loadExistingWeights:
+            model.load_state_dict(torch.load(config.model_path))
+
+        """load data"""
+        print('==> Preparing data..')
+        if config.dataset_name == 'CIFAR10':
+            output_features = 10
+            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size)
+        elif config.dataset_name == 'CIFAR100':
+            output_features = 100
+            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size)
+        elif config.dataset_name == 'CDON':
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+        """training algorithm"""
+        criterion = torch.nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
+                              weight_decay=config.weight_decay)
+        scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
 
         # and use them to train the model
-        (train_loss_per_epoch, test_loss_per_epoch,
-         correct_per_epoch, memorized_per_epoch, incorrect_per_epoch) = train(
-            model, criterion, optimizer, n_epochs=config.n_epochs,
-            train_loader=train_loader, test_loader=test_loader, scheduler=scheduler,
-            config=config)
+        (train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch) = train(model, criterion, optimizer, n_epochs=config.n_epochs, train_loader=train_loader, test_loader=test_loader, scheduler=scheduler, config=config)
 
         """Plot learning curve and accuracy"""
         print(f'acc={correct_per_epoch[-1]}, memorized={memorized_per_epoch[-1]}')
@@ -205,39 +200,32 @@ def model_pipeline(hyperparameters):
         torch.save(model.state_dict(), config.model_path)
 
 
-def make(config):
-    """Prepare data"""
-    print('==> Preparing data..')
-    if config.dataset_name == 'CIFAR10':
-        output_features = 10
-        train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size)
-    elif config.dataset_name == 'CIFAR100':
-        output_features = 100
-        train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size)
-    elif config.dataset_name == 'CDON':
-        print('Incorrect dataset_name')
-        pass
-        # output_features = ??
-    else:
-        print('Incorrect dataset_name')
-        pass
-
-    model = trainer_config['model'](output_features).to(device)
-
-    if loadExistingWeights:
-        model.load_state_dict(torch.load(config.model_path))
-
-    # Make the loss and optimizer
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
-                          weight_decay=config.weight_decay)
-    scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
-
-    return model, train_loader, test_loader, criterion, optimizer, scheduler
-
-
 def main():
-    model_pipeline(config)
+    config = dict(
+        n_epochs=1,
+        batch_size=128,
+        classes=10,
+        noise_rate=0.2,
+        dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
+        model_path='./models/CIFAR10_noise_level_10.mdl',
+        learning_rate=0.02,
+        momentum=0.9,
+        weight_decay=1e-3,
+        milestones=[40, 80],
+        gamma=0.01,
+        enable_amp=True
+    )
+
+    trainer_config = {
+        'model': ResNet34,
+        'optimizer': optim.SGD,
+        'optimizer_params': {'lr': config['learning_rate'], 'momentum': config['momentum'],
+                             'weight_decay': config['weight_decay']},
+        'scheduler': optim.lr_scheduler.MultiStepLR,
+        'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']}
+    }
+
+    model_pipeline(config, trainer_config)
 
 
 if __name__ == '__main__':
