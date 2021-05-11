@@ -13,23 +13,6 @@ import datasets
 from pathlib import Path
 import wandb
 
-useWandB = True
-loadExistingWeights = False
-
-# login to wandb
-if useWandB:
-    wandb.login()
-
-wandb_project = 'dd2424-ResNet-team'
-#wandb_project = 'DD2424-ResNet'
-
-
-
-# use_CosAnneal = {
-#     'scheduler': optim.lr_scheduler.CosineAnnealingLR,
-#     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
-# }
-# trainer_config.update(use_CosAnneal)
 
 # set global env variable
 if torch.cuda.is_available():
@@ -56,7 +39,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
 
     example_ct = 0  # number of examples seen
     batch_ct = 0
-
+    n = len(train_loader.dataset)
     for epoch in tqdm(range(n_epochs)):
         # activate train mode
         model.train()
@@ -94,7 +77,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
             # print(f"Loss after " + str(example_ct).zfill(5) + f" examples: {loss_for_wand_b:.3f}")
 
-        train_loss_per_epoch.append(train_loss / len(train_loader.dataset))
+        train_loss_per_epoch.append(train_loss / n)
 
         if test_loader is not None:
             model.eval()
@@ -133,8 +116,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         # anneal learning rate
         scheduler.step()
 
-    return (train_loss_per_epoch, test_loss_per_epoch,
-            correct_per_epoch, memorized_per_epoch, incorrect_per_epoch,)
+    return train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch
 
 
 def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memorized, test_incorrect, title):
@@ -157,8 +139,9 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memori
     plt.show()
 
 
-def model_pipeline(config, trainer_config):
-    # tell wandb to get started
+def model_pipeline(config, trainer_config, loadExistingWeights=False):
+    # Start wandb
+    wandb_project = 'dd2424-ResNet-team'
     with wandb.init(project=wandb_project, config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
@@ -188,8 +171,10 @@ def model_pipeline(config, trainer_config):
                               weight_decay=config.weight_decay)
         scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
 
-        # and use them to train the model
-        (train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch) = train(model, criterion, optimizer, n_epochs=config.n_epochs, train_loader=train_loader, test_loader=test_loader, scheduler=scheduler, config=config)
+        """train model"""
+        train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch = train(
+            model, criterion, optimizer, n_epochs=config.n_epochs, train_loader=train_loader, test_loader=test_loader,
+            scheduler=scheduler, config=config)
 
         """Plot learning curve and accuracy"""
         print(f'acc={correct_per_epoch[-1]}, memorized={memorized_per_epoch[-1]}')
@@ -201,6 +186,9 @@ def model_pipeline(config, trainer_config):
 
 
 def main():
+
+    wandb.login()
+
     config = dict(
         n_epochs=1,
         batch_size=128,
@@ -225,7 +213,13 @@ def main():
         'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']}
     }
 
-    model_pipeline(config, trainer_config)
+    # use_CosAnneal = {
+    #     'scheduler': optim.lr_scheduler.CosineAnnealingLR,
+    #     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
+    # }
+    # trainer_config.update(use_CosAnneal)
+
+    model_pipeline(config, trainer_config, loadExistingWeights=False)
 
 
 if __name__ == '__main__':
