@@ -64,6 +64,7 @@ class ResNet18(nn.Module):
         return out
 
 
+
 class ResNet34(ResNet18):
     def __init__(self, num_classes):
         ResNet18.__init__(self, num_classes, layers_in_each_block_list=[3, 4, 6, 3])

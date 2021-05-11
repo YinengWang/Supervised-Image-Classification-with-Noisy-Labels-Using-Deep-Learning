@@ -6,7 +6,7 @@ from torchvision import transforms
 from Custom_dataset import CDONdataset
 
 
-def load_cdon_dataset():
+def load_cdon_dataset(batch_size=128):
     # Data
     print('==> Preparing CDON data..')
 
@@ -20,7 +20,7 @@ def load_cdon_dataset():
     root_folder = "/tmp/pycharm_project_alfred/Datasets/Test_data"
     dataset = CDONdataset("test_data.csv", root_folder, transform=transform)
     # train_set, test_set = torch.utils.data.random_split(dataset, [1, 1])
-    train_loader = DataLoader(dataset=dataset, batch_size=2, shuffle=False)
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     #
     # for train_images, train_labels in train_loader:
@@ -39,7 +39,7 @@ def load_cdon_dataset():
     return train_loader
 
 
-def load_cifar10_dataset():
+def load_cifar10_dataset(batch_size=128):
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -54,15 +54,15 @@ def load_cifar10_dataset():
 
     train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
 
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=8, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=2)
 
     test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=128, shuffle=False, num_workers=8, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return train_loader, test_loader
 
 
-def load_cifar100_dataset():
+def load_cifar100_dataset(batch_size=128):
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -77,9 +77,9 @@ def load_cifar100_dataset():
 
     train_data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
 
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=128, shuffle=True, num_workers=2)
+    train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=2)
 
     test_data = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=False, num_workers=2)
 
     return train_loader, test_loader

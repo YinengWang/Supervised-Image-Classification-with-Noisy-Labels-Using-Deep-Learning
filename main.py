@@ -14,6 +14,7 @@ import datasets
 import os.path
 from pathlib import Path
 import csv
+import wandb
 
 
 # set global env variable
@@ -26,10 +27,12 @@ else:
     device = 'cpu'
 
 
-def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None, enable_amp=True,
-          scheduler=None, noise_rate=0.0, is_symmetric_noise=True):
-    train_noise_generator = Noise(train_loader, noise_rate=noise_rate)
-    test_noise_generator = Noise(test_loader, noise_rate=noise_rate) if test_loader is not None else None
+def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None, scheduler=None, config=None):
+    # tell wandb to watch what the model gets up to: gradients, weights, and more!
+    wandb.watch(model, criterion, log='all', log_freq=100)
+
+    train_noise_generator = Noise(train_loader, noise_rate=config.noise_rate)
+    test_noise_generator = Noise(test_loader, noise_rate=config.noise_rate) if test_loader is not None else None
 
     train_loss_per_epoch = []
     test_loss_per_epoch = []
@@ -37,7 +40,10 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
     incorrect_per_epoch = []
     memorized_per_epoch = []
 
-    for _ in tqdm(range(n_epochs)):
+    example_ct = 0  # number of examples seen
+    batch_ct = 0
+    n = len(train_loader.dataset)
+    for epoch in tqdm(range(n_epochs)):
         # activate train mode
         model.train()
         train_loss = 0
@@ -50,7 +56,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             inputs, targets = inputs.to(device), targets_with_noise.to(device)
             optimizer.zero_grad()
 
-            if enable_amp:
+            if config.enable_amp:
                 scaler = GradScaler()
                 with autocast():
                     outputs = model(inputs)
@@ -66,7 +72,18 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 optimizer.step()
 
             train_loss += loss.item() * targets.size(0)
-        train_loss_per_epoch.append(train_loss / len(train_loader.dataset))
+            loss_batch = loss.item()
+
+            example_ct += len(inputs)
+            batch_ct += 1
+
+            # log loss on WandB every 25 steps
+            # if ((batch_ct + 1) % 25) == 0:
+            # loss_for_wand_b = float(train_loss/batch_ct)
+            wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
+            # print(f"Loss after " + str(example_ct).zfill(5) + f" examples: {loss_for_wand_b:.3f}")
+
+        train_loss_per_epoch.append(train_loss / n)
 
         if test_loader is not None:
             model.eval()
@@ -98,11 +115,16 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 memorized_per_epoch.append(memorized / total)
                 incorrect_per_epoch.append(incorrect / total)
 
+                wandb.log({"test_loss": test_loss / total, "test_accuracy": correct / total,
+                           "memorized": memorized / total, "incorrect": incorrect / total})
+                print(f"Test loss after " + str(example_ct).zfill(5) + f" examples: {test_loss / total:.3f}")
+                torch.onnx.export(model, inputs, "model.onnx")
+                wandb.save("model.onnx")
+
         # anneal learning rate
         scheduler.step()
 
-    return (train_loss_per_epoch, test_loss_per_epoch,
-            correct_per_epoch, memorized_per_epoch, incorrect_per_epoch,)
+    return train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch
 
 
 def plot_learning_curve_and_acc(results, title, path_prefix):
@@ -148,69 +170,86 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
         })
 
 
-def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, is_symmetric_noise=True, trainer_config_custom=None):
-    trainer_config = {
-        'model': ResNet34, 'enable_amp': True,
-        'optimizer': optim.SGD,
-        'optimizer_params': {'lr': 0.02, 'momentum': 0.9, 'weight_decay': 1e-3},
-        'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
-        'scheduler_params': {'T_0': 10, 'eta_min': 1e-3}
-    }
-    if trainer_config_custom is not None:
-        trainer_config.update(trainer_config_custom)
+def model_pipeline(config, trainer_config, loadExistingWeights=False):
+    # Start wandb
+    wandb_project = 'dd2424-ResNet-team'
+    with wandb.init(project=wandb_project, config=config):
+        # access all hyperparameters through wandb.config, so logging matches execution!
+        config = wandb.config
 
-    output_features = 10 if CIFAR10 else 100
-    dataset_name = 'CIFAR10' if CIFAR10 else 'CIFAR100'
+        """create the model"""
+        model = trainer_config['model'](config['classes']).to(device)
 
-    model = trainer_config['model'](output_features).to(device)
+        if loadExistingWeights:
+            model.load_state_dict(torch.load(config.model_path))
 
-    """Prepare data"""
-    print('==> Preparing data..')
-    if CIFAR10:
-        train_loader, test_loader = datasets.load_cifar10_dataset()
-    else:
-        train_loader, test_loader = datasets.load_cifar100_dataset()
+        """load data"""
+        print('==> Preparing data..')
+        if config.dataset_name == 'CIFAR10':
+            output_features = 10
+            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size)
+        elif config.dataset_name == 'CIFAR100':
+            output_features = 100
+            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size)
+        elif config.dataset_name == 'CDON':
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
 
-    """training for 10 epochs"""
-    print(f'==> Start training {dataset_name} '
-          f'with noise level {noise_rate} '
-          f'for {n_epochs} epochs')
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = trainer_config['optimizer'](model.parameters(), **trainer_config['optimizer_params'])
-    scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
+        """training algorithm"""
+        criterion = torch.nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
+                              weight_decay=config.weight_decay)
+        scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
 
-    train_results = train(
-        model, criterion, optimizer, n_epochs=n_epochs,
-        train_loader=train_loader, test_loader=test_loader, enable_amp=trainer_config['enable_amp'],
-        scheduler=scheduler, noise_rate=noise_rate, is_symmetric_noise=is_symmetric_noise)
-    return train_results, model
+        """train model"""
+        train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch = train(
+            model, criterion, optimizer, n_epochs=config.n_epochs, train_loader=train_loader, test_loader=test_loader,
+            scheduler=scheduler, config=config)
+
+        """Plot learning curve and accuracy"""
+        print(f'acc={correct_per_epoch[-1]}, memorized={memorized_per_epoch[-1]}')
+        plot_title = f'{config.dataset_name}, noise_level={config.noise_rate}'
+        plot_learning_curve_and_acc(train_loss_per_epoch, test_loss_per_epoch,
+                                    correct_per_epoch, memorized_per_epoch, incorrect_per_epoch, plot_title)
+        Path("./models").mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), config.model_path)
 
 
 def main():
-    # Create folders to save models and results if not exist
-    Path("./models").mkdir(parents=True, exist_ok=True)
-    Path("./results").mkdir(parents=True, exist_ok=True)
-    is_symmetric_noise = True
-    enable_amp = False
-    n_epochs = 120
-    for noise_rate in [0.2, 0.4, 0.6, 0.8]:
-        trainer_config = {
-            'enable_amp': enable_amp,
-            'scheduler': optim.lr_scheduler.MultiStepLR,
-            'scheduler_params': {'milestones': [40, 80], 'gamma': 0.01}
-        }
-        results, model = train_CIFAR(CIFAR10=True, n_epochs=n_epochs, noise_rate=noise_rate,
-                                     is_symmetric_noise=is_symmetric_noise,
-                                     trainer_config_custom=trainer_config)
+    wandb.login()
 
-        """Plot learning curve and accuracy. Save results."""
-        result_file_prefix = f'CIFAR10_sym_noise_{noise_rate}'
-        plot_title = f'CIFAR10, noise_level={noise_rate}'
-        plot_learning_curve_and_acc(results, plot_title, path_prefix='./results/' + result_file_prefix)
-        torch.save(model.state_dict(), './models/' + result_file_prefix + '.mdl')
-        record_results('./results/result.csv', 'CIFAR10', noise_rate, is_symmetric_noise, enable_amp, results)
-    # train_CIFAR(CIFAR10=False, n_epochs=150, noise_rate=0, model_path='./models/CIFAR100_noise_level_0.mdl')
-    # train_CIFAR(CIFAR10=False, n_epochs=150, noise_rate=0.1, model_path='./models/CIFAR100_noise_level_10.mdl')
+    config = dict(
+        n_epochs=1,
+        batch_size=128,
+        classes=10,
+        noise_rate=0.2,
+        dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
+        model_path='./models/CIFAR10_noise_level_10.mdl',
+        learning_rate=0.02,
+        momentum=0.9,
+        weight_decay=1e-3,
+        milestones=[40, 80],
+        gamma=0.01,
+        enable_amp=True
+    )
+
+    trainer_config = {
+        'model': ResNet34,
+        'optimizer': optim.SGD,
+        'optimizer_params': {'lr': config['learning_rate'], 'momentum': config['momentum'],
+                             'weight_decay': config['weight_decay']},
+        'scheduler': optim.lr_scheduler.MultiStepLR,
+        'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']}
+    }
+
+    # use_CosAnneal = {
+    #     'scheduler': optim.lr_scheduler.CosineAnnealingLR,
+    #     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
+    # }
+    # trainer_config.update(use_CosAnneal)
+
+    model_pipeline(config, trainer_config, loadExistingWeights=False)
 
 
 if __name__ == '__main__':
