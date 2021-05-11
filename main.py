@@ -156,7 +156,8 @@ def train_CIFAR(CIFAR10=True, n_epochs=100, noise_rate=0.0, is_symmetric_noise=T
         'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
         'scheduler_params': {'T_0': 10, 'eta_min': 1e-3}
     }
-    trainer_config.update(trainer_config_custom)
+    if trainer_config_custom is not None:
+        trainer_config.update(trainer_config_custom)
 
     output_features = 10 if CIFAR10 else 100
     dataset_name = 'CIFAR10' if CIFAR10 else 'CIFAR100'
