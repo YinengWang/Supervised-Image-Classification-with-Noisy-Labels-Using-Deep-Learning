@@ -48,7 +48,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         model.train()
         train_loss = 0
         for batch_idx, (inputs, targets) in enumerate(train_loader):
-            if is_symmetric_noise:
+            if config.is_symmetric_noise:
                 targets_with_noise = train_noise_generator.symmetric_noise(targets, batch_idx)
             else:
                 targets_with_noise = train_noise_generator.asymmetric_noise(targets, batch_idx)
@@ -92,7 +92,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 correct, incorrect, memorized, total = 0, 0, 0, 0
                 for batch_idx, (inputs, targets) in enumerate(test_loader):
                     original_targets = targets.to(device)
-                    if is_symmetric_noise:
+                    if config.is_symmetric_noise:
                         targets_with_noise = test_noise_generator.symmetric_noise(targets, batch_idx)
                     else:
                         targets_with_noise = test_noise_generator.asymmetric_noise(targets, batch_idx)
@@ -203,15 +203,13 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
 
         """train model"""
-        train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch = train(
+        results = train(
             model, criterion, optimizer, n_epochs=config.n_epochs, train_loader=train_loader, test_loader=test_loader,
             scheduler=scheduler, config=config)
 
         """Plot learning curve and accuracy"""
-        print(f'acc={correct_per_epoch[-1]}, memorized={memorized_per_epoch[-1]}')
         plot_title = f'{config.dataset_name}, noise_level={config.noise_rate}'
-        plot_learning_curve_and_acc(train_loss_per_epoch, test_loss_per_epoch,
-                                    correct_per_epoch, memorized_per_epoch, incorrect_per_epoch, plot_title)
+        plot_learning_curve_and_acc(results, plot_title, config.plot_path)
         Path("./models").mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), config.model_path)
 
@@ -224,8 +222,10 @@ def main():
         batch_size=128,
         classes=10,
         noise_rate=0.2,
+        is_symmetric_noise=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-        model_path='./models/CIFAR10_noise_level_10.mdl',
+        model_path='./models/CIFAR10_20.mdl',
+        plot_path='./results/CIFAR10_20',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
