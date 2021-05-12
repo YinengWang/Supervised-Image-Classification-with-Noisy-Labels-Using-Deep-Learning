@@ -8,7 +8,6 @@ import numpy as np
 
 from model import ResNet18
 from model import ResNet34
-from noise import Noise
 import datasets
 
 import os.path
@@ -31,8 +30,8 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
     # tell wandb to watch what the model gets up to: gradients, weights, and more!
     wandb.watch(model, criterion, log='all', log_freq=100)
 
-    train_noise_generator = Noise(train_loader, noise_rate=config.noise_rate)
-    test_noise_generator = Noise(test_loader, noise_rate=config.noise_rate) if test_loader is not None else None
+    # train_noise_generator = Noise(train_loader, noise_rate=config.noise_rate)
+    # test_noise_generator = Noise(test_loader, noise_rate=config.noise_rate) if test_loader is not None else None
 
     train_loss_per_epoch = []
     test_loss_per_epoch = []
@@ -42,18 +41,11 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
 
     example_ct = 0  # number of examples seen
     batch_ct = 0
-    n = len(train_loader.dataset)
     for epoch in tqdm(range(n_epochs)):
         # activate train mode
         model.train()
         train_loss = 0
-        for batch_idx, (inputs, targets) in enumerate(train_loader):
-            if config.is_symmetric_noise:
-                targets_with_noise = train_noise_generator.symmetric_noise(targets, batch_idx)
-            else:
-                targets_with_noise = train_noise_generator.asymmetric_noise(targets, batch_idx)
-            # to(device) copies data from CPU to GPU
-            inputs, targets = inputs.to(device), targets_with_noise.to(device)
+        for batch_idx, (inputs, targets, original_targets) in enumerate(train_loader):
             optimizer.zero_grad()
 
             if config.enable_amp:
@@ -83,20 +75,14 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
             # print(f"Loss after " + str(example_ct).zfill(5) + f" examples: {loss_for_wand_b:.3f}")
 
-        train_loss_per_epoch.append(train_loss / n)
+        train_loss_per_epoch.append(train_loss / train_loader.dataset_len)
 
         if test_loader is not None:
             model.eval()
             test_loss = 0
             with torch.no_grad():
                 correct, incorrect, memorized, total = 0, 0, 0, 0
-                for batch_idx, (inputs, targets) in enumerate(test_loader):
-                    original_targets = targets.to(device)
-                    if config.is_symmetric_noise:
-                        targets_with_noise = test_noise_generator.symmetric_noise(targets, batch_idx)
-                    else:
-                        targets_with_noise = test_noise_generator.asymmetric_noise(targets, batch_idx)
-                    inputs, targets = inputs.to(device), targets_with_noise.to(device)
+                for batch_idx, (inputs, targets, original_targets) in enumerate(test_loader):
                     outputs = model(inputs)
                     loss = criterion(outputs, targets)
 
@@ -187,10 +173,10 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         print('==> Preparing data..')
         if config.dataset_name == 'CIFAR10':
             output_features = 10
-            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size)
+            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size, device=device)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
-            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size)
+            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size, device=device)
         elif config.dataset_name == 'CDON':
             raise NotImplementedError
         else:
@@ -218,7 +204,7 @@ def main():
     wandb.login()
 
     config = dict(
-        n_epochs=1,
+        n_epochs=10,
         batch_size=128,
         classes=10,
         noise_rate=0.2,
