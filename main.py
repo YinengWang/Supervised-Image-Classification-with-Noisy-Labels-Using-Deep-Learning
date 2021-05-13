@@ -31,9 +31,6 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
     # tell wandb to watch what the model gets up to: gradients, weights, and more!
     wandb.watch(model, criterion, log='all', log_freq=100)
 
-    # train_noise_generator = Noise(train_loader, noise_rate=config.noise_rate)
-    # test_noise_generator = Noise(test_loader, noise_rate=config.noise_rate) if test_loader is not None else None
-
     train_loss_per_epoch = []
     test_loss_per_epoch = []
     correct_per_epoch = []
@@ -187,10 +184,12 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         print('==> Preparing data..')
         if config.dataset_name == 'CIFAR10':
             output_features = 10
-            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size, device=device)
+            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
+                                                                      noise_rate=config.noise_rate, device=device)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
-            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size, device=device)
+            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,
+                                                                       noise_rate=config.noise_rate, device=device)
         elif config.dataset_name == 'CDON':
             raise NotImplementedError
         else:
@@ -227,7 +226,7 @@ def main():
         n_epochs=10,
         batch_size=128,
         classes=10,
-        noise_rate=0.2,
+        noise_rate=0.0,
         is_symmetric_noise=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
