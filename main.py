@@ -46,6 +46,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         model.train()
         train_loss = 0
         for batch_idx, (inputs, targets, original_targets) in enumerate(train_loader):
+            inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
             optimizer.zero_grad()
 
             if config.enable_amp:
@@ -94,6 +95,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             with torch.no_grad():
                 correct, incorrect, memorized, total = 0, 0, 0, 0
                 for batch_idx, (inputs, targets, original_targets) in enumerate(test_loader):
+                    inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
                     outputs = model(inputs)
                     loss = criterion(outputs, targets)
 
@@ -185,11 +187,11 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         if config.dataset_name == 'CIFAR10':
             output_features = 10
             train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
-                                                                      noise_rate=config.noise_rate, device=device)
+                                                                      noise_rate=config.noise_rate)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
             train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,
-                                                                       noise_rate=config.noise_rate, device=device)
+                                                                       noise_rate=config.noise_rate)
         elif config.dataset_name == 'CDON':
             raise NotImplementedError
         else:
@@ -223,7 +225,7 @@ def main():
     wandb.login()
 
     config = dict(
-        n_epochs=10,
+        n_epochs=120,
         batch_size=128,
         classes=10,
         noise_rate=0.0,
