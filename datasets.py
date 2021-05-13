@@ -16,7 +16,7 @@ class FastTensorDataLoader:
     TensorDataset + DataLoader because dataloader grabs individual indices of
     the dataset and calls cat (slow).
     """
-    def __init__(self, *tensors, batch_size=32, shuffle=False, device='cpu'):
+    def __init__(self, *tensors, batch_size=32, shuffle=False):
         """
         Initialize a FastTensorDataLoader.
 
@@ -33,7 +33,6 @@ class FastTensorDataLoader:
         self.dataset_len = self.tensors[0].shape[0]
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.device = device
 
         # Calculate # batches
         n_batches, remainder = divmod(self.dataset_len, self.batch_size)
@@ -43,8 +42,7 @@ class FastTensorDataLoader:
 
     def __iter__(self):
         if self.shuffle:
-            # self.indices = torch.randperm(self.dataset_len, device=self.device)    # TODO: a PyTorch bug, upgrade to the newest version
-            self.indices = torch.randperm(self.dataset_len).to(self.device)
+            self.indices = torch.randperm(self.dataset_len)
         else:
             self.indices = None
         self.i = 0
@@ -98,7 +96,7 @@ def load_cdon_dataset(batch_size=128):
     return train_loader
 
 
-def generate_loader_with_noise(dataset, batch_size, shuffle, noise_rate, is_symmetric_noise, device):
+def generate_loader_with_noise(dataset, batch_size, shuffle, noise_rate, is_symmetric_noise):
     if noise_rate < 0 or noise_rate >= 1:
         raise ValueError('The rate of noisy labels should be between 0 and 1')
     # load all data into memory
@@ -114,11 +112,10 @@ def generate_loader_with_noise(dataset, batch_size, shuffle, noise_rate, is_symm
         else:
             raise NotImplementedError()
     inputs, targets, original_targets = collate.default_collate(data)     # concatenate into a single tensor
-    inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
-    return FastTensorDataLoader(inputs, targets, original_targets, batch_size=batch_size, shuffle=shuffle, device=device)
+    return FastTensorDataLoader(inputs, targets, original_targets, batch_size=batch_size, shuffle=shuffle)
 
 
-def load_cifar10_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True, device='cpu'):
+def load_cifar10_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True):
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -134,9 +131,9 @@ def load_cifar10_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True
     test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
 
     train_loader = generate_loader_with_noise(
-        train_data, batch_size=batch_size, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=True, device=device)
+        train_data, batch_size=batch_size, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=is_symmetric_noise)
     test_loader = generate_loader_with_noise(
-        test_data, batch_size=100, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=True, device=device)
+        test_data, batch_size=100, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=is_symmetric_noise)
     return train_loader, test_loader
 
 
@@ -157,7 +154,7 @@ def load_cifar100_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=Tru
     test_data = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
 
     train_loader = generate_loader_with_noise(
-        train_data, batch_size=batch_size, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=True, device=device)
+        train_data, batch_size=batch_size, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=is_symmetric_noise)
     test_loader = generate_loader_with_noise(
-        test_data, batch_size=100, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=True, device=device)
+        test_data, batch_size=100, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=is_symmetric_noise)
     return train_loader, test_loader

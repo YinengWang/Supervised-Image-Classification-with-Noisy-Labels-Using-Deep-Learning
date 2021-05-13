@@ -43,6 +43,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         model.train()
         train_loss = 0
         for batch_idx, (inputs, targets, original_targets) in enumerate(train_loader):
+            inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
             optimizer.zero_grad()
 
             if config.enable_amp:
@@ -80,6 +81,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             with torch.no_grad():
                 correct, incorrect, memorized, total = 0, 0, 0, 0
                 for batch_idx, (inputs, targets, original_targets) in enumerate(test_loader):
+                    inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
                     outputs = model(inputs)
                     loss = criterion(outputs, targets)
 
@@ -155,8 +157,9 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
 
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
-    wandb_project = 'dd2424-ResNet-team'
-    with wandb.init(project=wandb_project, config=config):
+    wandb_project = 'ResNet-basic'
+    entity = 'dd2424-group9'
+    with wandb.init(project=wandb_project, entity=entity, config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
 
@@ -171,11 +174,11 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         if config.dataset_name == 'CIFAR10':
             output_features = 10
             train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
-                                                                      noise_rate=config.noise_rate, device=device)
+                                                                      noise_rate=config.noise_rate)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
             train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,
-                                                                       noise_rate=config.noise_rate, device=device)
+                                                                       noise_rate=config.noise_rate)
         elif config.dataset_name == 'CDON':
             raise NotImplementedError
         else:
@@ -203,7 +206,7 @@ def main():
     wandb.login()
 
     config = dict(
-        n_epochs=10,
+        n_epochs=120,
         batch_size=128,
         classes=10,
         noise_rate=0.0,
@@ -234,7 +237,7 @@ def main():
     # }
     # trainer_config.update(use_CosAnneal)
 
-    for noise_rate in [0.0, 0.2, 0.4, 0.6, 0.8]:
+    for noise_rate in [0.2, 0.4, 0.6, 0.8]:
         config['noise_rate'] = noise_rate
         model_pipeline(config, trainer_config, loadExistingWeights=False)
 
