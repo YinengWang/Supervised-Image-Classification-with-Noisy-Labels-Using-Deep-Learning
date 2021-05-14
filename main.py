@@ -187,7 +187,7 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         if config.dataset_name == 'CIFAR10':
             output_features = 10
             train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
-                                                                      noise_rate=config.noise_rate, fraction=0.2)
+                                                                      noise_rate=config.noise_rate)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
             train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,

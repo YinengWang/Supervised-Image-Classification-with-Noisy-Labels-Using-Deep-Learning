@@ -63,7 +63,11 @@ class FastTensorDataLoader:
         return self.n_batches
 
     def get_indices_in_batch(self, batch_idx):
-        return self.indices[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size]
+        if self.indices is None:
+            return np.arange(batch_idx * self.batch_size,
+                             min((batch_idx + 1) * self.batch_size, self.dataset_len))
+        else:
+            return self.indices[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size]
 
 
 def load_cdon_dataset(batch_size=128):
@@ -144,7 +148,7 @@ def load_cifar10_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True
     return train_loader, test_loader
 
 
-def load_cifar100_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True):
+def load_cifar100_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True, fraction=1.0):
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -159,6 +163,10 @@ def load_cifar100_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=Tru
 
     train_data = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
     test_data = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
+    if fraction != 1.0:
+        num_samples = ceil(len(train_data.data) * fraction)
+        train_data.data = train_data.data[:num_samples]
+        train_data.targets = train_data.targets[:num_samples]
 
     train_loader = generate_loader_with_noise(
         train_data, batch_size=batch_size, shuffle=True, noise_rate=noise_rate, is_symmetric_noise=is_symmetric_noise)
