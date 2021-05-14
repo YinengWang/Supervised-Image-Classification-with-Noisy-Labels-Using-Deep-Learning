@@ -41,7 +41,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
     example_ct = 0  # number of examples seen
     batch_ct = 0
     n = len(train_loader.dataset)
-    test_criterion = torch.nn.CrossEntropyLoss
+    test_criterion = torch.nn.CrossEntropyLoss()
 
     for epoch in tqdm(range(n_epochs)):
         # activate train mode
@@ -243,11 +243,11 @@ def main():
     # trainer_config.update(use_CosAnneal)
 
     if config['use_ELR']:
-    use_ELR = {
-        'criterion': ELR_loss,
-        'criterion_params': {'beta': 0.3, 'lam': 3}
-    }
-    trainer_config.update(use_ELR)
+        use_ELR = {
+            'criterion': ELR_loss,
+            'criterion_params': {'beta': 0.3, 'lam': 3}
+        }
+        trainer_config.update(use_ELR)
 
     model_pipeline(config, trainer_config, loadExistingWeights=False)
 
