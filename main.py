@@ -239,6 +239,7 @@ def main():
 
     for noise_rate in [0.2, 0.4, 0.6, 0.8]:
         config['noise_rate'] = noise_rate
+        config['model_path'] = f'./models/CIFAR10_{noise_rate}.mdl',
         model_pipeline(config, trainer_config, loadExistingWeights=False)
 
 
