@@ -55,7 +55,8 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                     outputs = model(inputs)
 
                     if config['use_ELR']:
-                        inds = train_noise_generator.get_indices_in_batch(batch_idx)
+                        inds = np.arange(batch_idx * config.batch_size,
+                                         min((batch_idx+1) * config.batch_size, train_loader.dataset_len))
                         loss = criterion(inds, outputs, targets)
                     else:
                         loss = criterion(outputs, targets)
@@ -67,7 +68,8 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 outputs = model(inputs)
 
                 if config['use_ELR']:
-                    inds = train_noise_generator.get_indices_in_batch(batch_idx)
+                    inds = np.arange(batch_idx * config.batch_size,
+                                     min((batch_idx + 1) * config.batch_size, train_loader.dataset_len))
                     loss = criterion(inds, outputs, targets)
                 else:
                     loss = criterion(outputs, targets)
@@ -97,7 +99,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 for batch_idx, (inputs, targets, original_targets) in enumerate(test_loader):
                     inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
                     outputs = model(inputs)
-                    loss = criterion(outputs, targets)
+                    loss = test_criterion(outputs, targets)
 
                     _, predicted = outputs.max(1)
                     total += targets.size(0)
@@ -187,7 +189,7 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         if config.dataset_name == 'CIFAR10':
             output_features = 10
             train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
-                                                                      noise_rate=config.noise_rate)
+                                                                      noise_rate=config.noise_rate, fraction=0.2)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
             train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,
@@ -200,7 +202,7 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         """training algorithm"""
         if config['use_ELR']:
             print('--Using ELR--')
-            criterion = trainer_config['criterion'](len(train_loader.dataset), n_classes=output_features, **trainer_config['criterion_params'])
+            criterion = trainer_config['criterion'](train_loader.dataset_len, n_classes=output_features, **trainer_config['criterion_params'])
         else:
             print('--Using CE loss--')
             criterion = trainer_config['criterion'](**trainer_config['criterion_params'])
