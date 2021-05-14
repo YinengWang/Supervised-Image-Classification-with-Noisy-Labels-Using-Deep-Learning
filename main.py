@@ -127,6 +127,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
 
 
 def plot_learning_curve_and_acc(results, title, path_prefix):
+    Path("./results").mkdir(parents=True, exist_ok=True)
     train_cost, test_cost, test_correct, test_memorized, test_incorrect = results
     epochs = np.arange(1, len(train_cost) + 1)
     # plot learning curve
