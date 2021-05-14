@@ -210,12 +210,12 @@ def main():
     wandb.login()
 
     config = dict(
-        n_epochs=1,
+        n_epochs=5,
         batch_size=128,
         classes=10,
         noise_rate=0.2,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-        model_path='./models/CIFAR10_noise_level_10.mdl',
+        model_path='./models/CIFAR10_noise_level_20.mdl',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
@@ -226,7 +226,7 @@ def main():
     )
 
     trainer_config = {
-        'model': ResNet18,
+        'model': ResNet34,
         'optimizer': optim.SGD,
         'optimizer_params': {'lr': config['learning_rate'], 'momentum': config['momentum'],
                              'weight_decay': config['weight_decay']},
