@@ -137,7 +137,7 @@ def load_cifar10_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True
     return train_loader, test_loader
 
 
-def load_cifar100_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True, device='cpu'):
+def load_cifar100_dataset(batch_size=128, noise_rate=0.0, is_symmetric_noise=True):
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
