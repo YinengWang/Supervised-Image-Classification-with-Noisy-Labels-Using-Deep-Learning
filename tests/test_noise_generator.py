@@ -7,7 +7,7 @@ import datasets
 from math import ceil
 
 
-def test_noise_correctness(batch_size=128, num_epochs=10, noise_rate=0.2, is_symmetric_noise=True):
+def test_noise_generator(batch_size=128, num_epochs=10, noise_rate=0.2, is_symmetric_noise=True):
     def find(arr, v):
         return [t.all() for t in arr == v].index(True)
 
@@ -45,4 +45,4 @@ def test_noise_correctness(batch_size=128, num_epochs=10, noise_rate=0.2, is_sym
 
 
 if __name__ == '__main__':
-    test_noise_correctness()
+    test_noise_generator()
