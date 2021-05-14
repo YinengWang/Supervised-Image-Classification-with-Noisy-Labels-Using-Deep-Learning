@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
+from loss import ELR_loss
 from model import ResNet18
 from model import ResNet34
 from noise import Noise
@@ -40,6 +41,8 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
     example_ct = 0  # number of examples seen
     batch_ct = 0
     n = len(train_loader.dataset)
+    test_criterion = torch.nn.CrossEntropyLoss
+
     for epoch in tqdm(range(n_epochs)):
         # activate train mode
         model.train()
@@ -54,14 +57,25 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 scaler = GradScaler()
                 with autocast():
                     outputs = model(inputs)
-                    loss = criterion(outputs, targets)
+
+                    if config['use_ELR']:
+                        inds = train_noise_generator.get_indices_in_batch(batch_idx)
+                        loss = criterion(inds, outputs, targets)
+                    else:
+                        loss = criterion(outputs, targets)
 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
             else:
                 outputs = model(inputs)
-                loss = criterion(outputs, targets)
+
+                if config['use_ELR']:
+                    inds = train_noise_generator.get_indices_in_batch(batch_idx)
+                    loss = criterion(inds, outputs, targets)
+                else:
+                    loss = criterion(outputs, targets)
+
                 loss.backward()
                 optimizer.step()
 
@@ -90,7 +104,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                         targets_with_noise = test_noise_generator.symmetric_noise(targets, batch_idx)
                         inputs, targets = inputs.to(device), targets_with_noise.to(device)
                         outputs = model(inputs)
-                        loss = criterion(outputs, targets)
+                        loss = test_criterion(outputs, targets)
 
                         _, predicted = outputs.max(1)
                         total += targets.size(0)
@@ -141,7 +155,7 @@ def plot_learning_curve_and_acc(train_cost, test_cost, test_correct, test_memori
 
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
-    wandb_project = 'dd2424-ResNet-team'
+    wandb_project = 'ResNet-ELR'
     with wandb.init(project=wandb_project, config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
@@ -166,7 +180,13 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
             raise NotImplementedError
 
         """training algorithm"""
-        criterion = torch.nn.CrossEntropyLoss()
+        if config['use_ELR']:
+            print('--Using ELR--')
+            criterion = trainer_config['criterion'](len(train_loader.dataset), n_classes=output_features, **trainer_config['criterion_params'])
+        else:
+            print('--Using CE loss--')
+            criterion = trainer_config['criterion'](**trainer_config['criterion_params'])
+
         optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
                               weight_decay=config.weight_decay)
         scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
@@ -201,16 +221,19 @@ def main():
         weight_decay=1e-3,
         milestones=[40, 80],
         gamma=0.01,
-        enable_amp=True
+        enable_amp=True,
+        use_ELR=True
     )
 
     trainer_config = {
-        'model': ResNet34,
+        'model': ResNet18,
         'optimizer': optim.SGD,
         'optimizer_params': {'lr': config['learning_rate'], 'momentum': config['momentum'],
                              'weight_decay': config['weight_decay']},
         'scheduler': optim.lr_scheduler.MultiStepLR,
-        'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']}
+        'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']},
+        'criterion': torch.nn.CrossEntropyLoss,
+        'criterion_params': {}
     }
 
     # use_CosAnneal = {
@@ -218,6 +241,13 @@ def main():
     #     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
     # }
     # trainer_config.update(use_CosAnneal)
+
+    if config['use_ELR']:
+    use_ELR = {
+        'criterion': ELR_loss,
+        'criterion_params': {'beta': 0.3, 'lam': 3}
+    }
+    trainer_config.update(use_ELR)
 
     model_pipeline(config, trainer_config, loadExistingWeights=False)
 
