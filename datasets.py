@@ -62,6 +62,9 @@ class FastTensorDataLoader:
     def __len__(self):
         return self.n_batches
 
+    def get_indices_in_batch(self, batch_idx):
+        return self.indices[batch_idx*self.batch_size:(batch_idx+1)*self.batch_size]
+
 
 def load_cdon_dataset(batch_size=128):
     # Data

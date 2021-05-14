@@ -55,8 +55,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                     outputs = model(inputs)
 
                     if config['use_ELR']:
-                        inds = np.arange(batch_idx * config.batch_size,
-                                         min((batch_idx+1) * config.batch_size, train_loader.dataset_len))
+                        inds = train_loader.get_indices_in_batch(batch_idx)
                         loss = criterion(inds, outputs, targets)
                     else:
                         loss = criterion(outputs, targets)
@@ -68,8 +67,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 outputs = model(inputs)
 
                 if config['use_ELR']:
-                    inds = np.arange(batch_idx * config.batch_size,
-                                     min((batch_idx + 1) * config.batch_size, train_loader.dataset_len))
+                    inds = train_loader.get_indices_in_batch(batch_idx)
                     loss = criterion(inds, outputs, targets)
                 else:
                     loss = criterion(outputs, targets)
@@ -230,7 +228,7 @@ def main():
         n_epochs=120,
         batch_size=128,
         classes=10,
-        noise_rate=0.0,
+        noise_rate=0.2,
         is_symmetric_noise=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
