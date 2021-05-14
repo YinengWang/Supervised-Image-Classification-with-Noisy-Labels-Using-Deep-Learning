@@ -33,9 +33,12 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
 
     train_loss_per_epoch = []
     test_loss_per_epoch = []
-    correct_per_epoch = []
-    incorrect_per_epoch = []
-    memorized_per_epoch = []
+    accuracy_per_epoch = []
+    correct_clean_per_epoch = []
+    incorrect_clean_per_epoch = []
+    correct_wrong_per_epoch = []
+    incorrect_wrong_per_epoch = []
+    memorized_wrong_per_epoch = []
 
     example_ct = 0  # number of examples seen
     batch_ct = 0
@@ -45,6 +48,10 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         # activate train mode
         model.train()
         train_loss = 0
+        total_clean, total_wrong = 0, 0
+        correct_in_clean, incorrect_in_clean = 0, 0
+        correct_in_wrong, memorized_in_wrong, incorrect_in_wrong = 0, 0, 0
+
         for batch_idx, (inputs, targets, original_targets) in enumerate(train_loader):
             inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
             optimizer.zero_grad()
@@ -75,6 +82,23 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 loss.backward()
                 optimizer.step()
 
+            # Compute correct, incorrect, memorized
+            with torch.no_grad():
+                _, predicted = outputs.max(1)
+
+                is_clean = (targets == original_targets)
+                is_wrong = ~is_clean
+                total_clean += is_clean.sum().item()
+                total_wrong += is_wrong.sum().item()
+                is_correct = (predicted == original_targets)
+                correct_in_clean += (is_clean & is_correct).sum().item()
+                incorrect_in_clean += (is_clean & ~is_correct).sum().item()
+                if config.noise_rate != 0.0:
+                    is_memorized = (predicted == targets)
+                    correct_in_wrong += (is_wrong & is_correct).sum().item()
+                    memorized_in_wrong += (is_wrong & is_memorized).sum().item()
+                    incorrect_in_wrong += (is_wrong & ~is_correct & ~is_memorized).sum().item()
+
             train_loss += loss.item() * targets.size(0)
             loss_batch = loss.item()
 
@@ -87,13 +111,24 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
             # print(f"Loss after " + str(example_ct).zfill(5) + f" examples: {loss_for_wand_b:.3f}")
 
+        correct_in_clean /= total_clean
+        incorrect_in_clean /= total_clean
+        if config.noise_rate != 0.0:
+            correct_in_wrong /= total_wrong
+            memorized_in_wrong /= total_wrong
+            incorrect_in_wrong /= total_wrong
+        correct_clean_per_epoch.append(correct_in_clean)
+        incorrect_clean_per_epoch.append(incorrect_in_clean)
+        correct_wrong_per_epoch.append(correct_in_wrong)
+        memorized_wrong_per_epoch.append(memorized_in_wrong)
+        incorrect_wrong_per_epoch.append(incorrect_in_wrong)
         train_loss_per_epoch.append(train_loss / train_loader.dataset_len)
 
         if test_loader is not None:
             model.eval()
             test_loss = 0
             with torch.no_grad():
-                correct, incorrect, memorized, total = 0, 0, 0, 0
+                correct, total = 0, 0
                 for batch_idx, (inputs, targets, original_targets) in enumerate(test_loader):
                     inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
                     outputs = model(inputs)
@@ -101,21 +136,17 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
 
                     _, predicted = outputs.max(1)
                     total += targets.size(0)
-                    correct_idx = predicted.eq(original_targets)
-                    memorized_idx = ((predicted != original_targets) & (predicted == targets))
-                    incorrect_idx = ((predicted != original_targets) & (predicted != targets))
-                    correct += correct_idx.sum().item()
-                    memorized += memorized_idx.sum().item()
-                    incorrect += incorrect_idx.sum().item()
+                    correct += predicted.eq(original_targets).sum().item()
                     test_loss += loss.item() * targets.size(0)
 
                 test_loss_per_epoch.append(test_loss / total)
-                correct_per_epoch.append(correct / total)
-                memorized_per_epoch.append(memorized / total)
-                incorrect_per_epoch.append(incorrect / total)
+                accuracy_per_epoch.append(correct / total)
 
                 wandb.log({"test_loss": test_loss / total, "test_accuracy": correct / total,
-                           "memorized": memorized / total, "incorrect": incorrect / total})
+                           "correct_clean": correct_in_clean, "incorrect_clean": incorrect_in_clean,
+                           "correct_wrong": correct_in_wrong,
+                           "memorized_wrong": memorized_in_wrong,
+                           "incorrect_wrong": incorrect_in_wrong})
                 print(f"Test loss after " + str(example_ct).zfill(5) + f" examples: {test_loss / total:.3f}")
                 torch.onnx.export(model, inputs, "model.onnx")
                 wandb.save("model.onnx")
@@ -123,12 +154,14 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         # anneal learning rate
         scheduler.step()
 
-    return train_loss_per_epoch, test_loss_per_epoch, correct_per_epoch, memorized_per_epoch, incorrect_per_epoch
+    return (train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch,
+            correct_clean_per_epoch, incorrect_clean_per_epoch,
+            correct_wrong_per_epoch, memorized_wrong_per_epoch, incorrect_wrong_per_epoch)
 
 
 def plot_learning_curve_and_acc(results, title, path_prefix):
     Path("./results").mkdir(parents=True, exist_ok=True)
-    train_cost, test_cost, test_correct, test_memorized, test_incorrect = results
+    train_cost, test_cost, test_accuracy, correct_clean, incorrect_clean, correct_wrong, memorized_wrong, incorrect_wrong = results
     epochs = np.arange(1, len(train_cost) + 1)
     # plot learning curve
     plt.plot(epochs, train_cost)
@@ -140,15 +173,34 @@ def plot_learning_curve_and_acc(results, title, path_prefix):
     plt.savefig(path_prefix + '_loss.pdf')
     plt.show()
 
-    # plot fraction of correct, incorrect, memorized samples
-    plt.plot(epochs, test_correct)
-    plt.plot(epochs, test_memorized)
-    plt.plot(epochs, test_incorrect)
+    # plot accuracy
+    plt.plot(epochs, test_accuracy)
+    plt.title(title)
+    plt.xlabel('Epoch')
+    plt.ylabel('%')
+    plt.legend(['Accuracy'])
+    plt.savefig(path_prefix + '_acc.pdf')
+    plt.show()
+
+    # plot fraction of correct, incorrect, memorized samples in wrong labels
+    plt.plot(epochs, correct_wrong)
+    plt.plot(epochs, memorized_wrong)
+    plt.plot(epochs, incorrect_wrong)
     plt.title(title)
     plt.xlabel('Epoch')
     plt.ylabel('Fraction of examples')
     plt.legend(['Correct', 'Memorized', 'Incorrect'])
-    plt.savefig(path_prefix + '_acc.pdf')
+    plt.savefig(path_prefix + '_wrong.pdf')
+    plt.show()
+
+    # plot fraction of correct and incorrect samples in clean labels
+    plt.plot(epochs, correct_clean)
+    plt.plot(epochs, incorrect_clean)
+    plt.title(title)
+    plt.xlabel('Epoch')
+    plt.ylabel('Fraction of examples')
+    plt.legend(['Correct', 'Incorrect'])
+    plt.savefig(path_prefix + '_clean.pdf')
     plt.show()
 
 
@@ -188,11 +240,13 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         if config.dataset_name == 'CIFAR10':
             output_features = 10
             train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
-                                                                      noise_rate=config.noise_rate)
+                                                                      noise_rate=config.noise_rate,
+                                                                      fraction=config.fraction)
         elif config.dataset_name == 'CIFAR100':
             output_features = 100
             train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,
-                                                                       noise_rate=config.noise_rate)
+                                                                       noise_rate=config.noise_rate,
+                                                                       fraction=config.fraction)
         elif config.dataset_name == 'CDON':
             raise NotImplementedError
         else:
@@ -231,6 +285,7 @@ def main():
         classes=10,
         noise_rate=0.2,
         is_symmetric_noise=True,
+        fraction=1.0,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
         plot_path='./results/CIFAR10_20',
