@@ -293,7 +293,7 @@ def main():
         classes=10,
         noise_rate=0.2,
         is_symmetric_noise=True,
-        fraction=0.01,
+        fraction=1.0,
         compute_memorization=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
