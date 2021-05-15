@@ -133,7 +133,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             incorrect_wrong_per_epoch.append(incorrect_in_wrong)
             wandb.log({"correct_clean": correct_in_clean, "incorrect_clean": incorrect_in_clean,
                        "correct_wrong": correct_in_wrong, "memorized_wrong": memorized_in_wrong,
-                       "incorrect_wrong": incorrect_in_wrong})
+                       "incorrect_wrong": incorrect_in_wrong}, step=batch_ct)
 
         if test_loader is not None:
             model.eval()
@@ -153,7 +153,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
                 test_loss_per_epoch.append(test_loss / total)
                 accuracy_per_epoch.append(correct / total)
 
-                wandb.log({"test_loss": test_loss / total, "test_accuracy": correct / total})
+                wandb.log({"test_loss": test_loss / total, "test_accuracy": correct / total}, step=batch_ct)
                 print(f"Test loss after " + str(example_ct).zfill(5) + f" examples: {test_loss / total:.3f}")
                 torch.onnx.export(model, inputs, "model.onnx")
                 wandb.save("model.onnx")
@@ -293,7 +293,7 @@ def main():
         classes=10,
         noise_rate=0.2,
         is_symmetric_noise=True,
-        fraction=1.0,
+        fraction=0.01,
         compute_memorization=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
