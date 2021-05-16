@@ -16,7 +16,6 @@ from pathlib import Path
 import wandb
 import csv
 
-
 # set global env variable
 if torch.cuda.is_available():
     print('GPU is enabled!')
@@ -232,8 +231,9 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
 
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
-    wandb_project = 'ResNet-ELR'
-    with wandb.init(project=wandb_project, config=config):
+    wandb_project = 'resnet-elr-cifar10'
+    wandb_entity = 'dd2424-group9'
+    with wandb.init(project=wandb_project, entity=wandb_entity, config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
 
@@ -291,7 +291,7 @@ def main():
         n_epochs=120,
         batch_size=128,
         classes=10,
-        noise_rate=0.2,
+        noise_rate=0.4,
         is_symmetric_noise=True,
         fraction=1.0,
         compute_memorization=True,
@@ -304,7 +304,10 @@ def main():
         milestones=[40, 80],
         gamma=0.01,
         enable_amp=True,
-        use_ELR=True
+        use_ELR=True,
+        elr_lambda=3.0,
+        elr_beta=0.7
+
     )
 
     trainer_config = {
@@ -319,15 +322,16 @@ def main():
     }
 
     # use_CosAnneal = {
-    #     'scheduler': optim.lr_scheduler.CosineAnnealingLR,
-    #     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
+    #     'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
+    #     'scheduler_params': {"T_0": 10, "eta_min": 0.001},
+    #     # 'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
     # }
     # trainer_config.update(use_CosAnneal)
 
     if config['use_ELR']:
         use_ELR = {
             'criterion': ELR_loss,
-            'criterion_params': {'beta': 0.3, 'lam': 3}
+            'criterion_params': {'beta': config['elr_beta'], 'lam': config['elr_lambda']}
         }
         trainer_config.update(use_ELR)
 
