@@ -4,11 +4,11 @@
 
     The final dataset can be store according to two different conventions:
         one that is more pytorch friendly: saves the images as individual files inside a folder and the labels in a csv
-        the other is more numpy friendly: the images are stored as numpy array inside a file "pickled" from a dictionary with also the labels 
-    
+        the other is more numpy friendly: the images are stored as numpy array inside a file "pickled" from a dictionary with also the labels
+
     Details of the numpy version:
         The final dataset is stored in the final_filename{i} files according to CIFAR semantics:
-        The archive contains the files dataset1, dataset2, ... Each of these files is a Python "pickled" object produced with Pickle. 
+        The archive contains the files dataset1, dataset2, ... Each of these files is a Python "pickled" object produced with Pickle.
         Here is a python3 routine which will open such a file and return a dictionary:
 
         def unpickle(file):
@@ -16,7 +16,7 @@
             with open(file, 'rb') as fo:
                 dict = pickle.load(fo, encoding='bytes')
             return dict
-        
+
         Loaded in this way, each of the batch files contains a dictionary with the following elements:
         data -- a 10000x3072 numpy array of uint8s. Each row of the array stores a 32x32 colour image.
                 The first 1024 entries contain the red channel values, the next 1024 the green, and the final 1024 the blue.
@@ -100,8 +100,8 @@ def store_data(config, data, labels, sublabels):
             with open(config.dataset_folder + "images/" + image_name, "wb") as file:
                 file.write(image)
             config.labels_writer.writerow([image_name, label, sublabel])
-        
-        
+
+
 
 def download_file_images(file, data, labels, sublabels, config, categories, lock):
     global collected_samples
@@ -163,7 +163,7 @@ def multithread_image_download(config, max_threads):
     sublabels = []
 
     common_lock = RLock()
-    
+
     labels_csv_file = None
     if config.store_format == STORE_FORMAT.PYTORCH_FRIENDLY:
         if not exists(config.dataset_folder + "images"):
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     parser.add_argument('--threads', help="the max number of threads running at the same time, default: uncapped")
     parser.add_argument('--dataset-percentage', help="the percentage of the dataset to download, default is 10")
     args = vars(parser.parse_args())
-    
+
     # set arguments based on the parsed ones
     if args['format'] == "pytorch":
         downloader_config.store_format = STORE_FORMAT.PYTORCH_FRIENDLY
@@ -199,7 +199,7 @@ if __name__ == "__main__":
         print('The format you provided is not valid.')
         parser.print_help()
         exit()
-    
+
     if args['folder']:
         downloader_config.dataset_folder = args['csv-folder']
         if downloader_config.dataset_folder[-1] != "/":
@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     if args['dataset_percentage']:
         downloader_config.percentage2download = args['dataset-percentage']
-    
+
     # define lambda used in NUMPY_FRIDENLY to name the datasets name
     downloader_config.final_dataset_path = lambda: f'{downloader_config.dataset_folder}{downloader_config.final_filename}' +\
                                                    f'{int(np.ceil(collected_samples / downloader_config.samples4file))}'
