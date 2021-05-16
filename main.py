@@ -131,9 +131,9 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             correct_wrong_per_epoch.append(correct_in_wrong)
             memorized_wrong_per_epoch.append(memorized_in_wrong)
             incorrect_wrong_per_epoch.append(incorrect_in_wrong)
-            wandb.log({"correct_clean": correct_in_clean, "incorrect_clean": incorrect_in_clean,
-                       "correct_wrong": correct_in_wrong, "memorized_wrong": memorized_in_wrong,
-                       "incorrect_wrong": incorrect_in_wrong}, step=batch_ct)
+            wandb.log({"correct_in_clean_labels": correct_in_clean, "incorrect_in_clean_labels": incorrect_in_clean,
+                       "correct_in_wrong_labels": correct_in_wrong, "memorized_in_wrong_labels": memorized_in_wrong,
+                       "incorrect_in_wrong_labels": incorrect_in_wrong}, step=batch_ct)
 
         if test_loader is not None:
             model.eval()
