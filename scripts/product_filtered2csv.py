@@ -1,6 +1,6 @@
 """"
-    This is a script to gather useful information from each product and save it in a csv file. 
-    The info collected are: 
+    This is a script to gather useful information from each product and save it in a csv file.
+    The info collected are:
         category (from the file), name (title), thumbnail_url (thumbnail), date (release_date), img_url (big_images -> big_image), sub_category_id (catid), subcategory (categories -> category)
     The script also excludes 'bad' product recognized by having:
         <link>https://cdon.se/</link>
