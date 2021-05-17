@@ -26,31 +26,25 @@ else:
     device = 'cpu'
 
 
-def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None, scheduler=None, config=None):
+def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler=None, config=None):
     # tell wandb to watch what the model gets up to: gradients, weights, and more!
     wandb.watch(model, criterion, log='all', log_freq=100)
 
     train_loss_per_epoch = []
     test_loss_per_epoch = []
     accuracy_per_epoch = []
-    if config.compute_memorization:
+    if config.compute_memorization: # keep parameters for memorization
         correct_clean_per_epoch = []
         incorrect_clean_per_epoch = []
         correct_wrong_per_epoch = []
         incorrect_wrong_per_epoch = []
         memorized_wrong_per_epoch = []
-    else:
-        correct_clean_per_epoch = None
-        incorrect_clean_per_epoch = None
-        correct_wrong_per_epoch = None
-        incorrect_wrong_per_epoch = None
-        memorized_wrong_per_epoch = None
 
     example_ct = 0  # number of examples seen
     batch_ct = 0
     test_criterion = torch.nn.CrossEntropyLoss()
 
-    for epoch in tqdm(range(n_epochs)):
+    for epoch in tqdm(range(config.n_epochs)):
         # activate train mode
         model.train()
         train_loss = 0
@@ -58,8 +52,8 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         correct_in_clean, incorrect_in_clean = 0, 0
         correct_in_wrong, memorized_in_wrong, incorrect_in_wrong = 0, 0, 0
 
-        for batch_idx, (inputs, targets, original_targets) in enumerate(train_loader):
-            inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
+        for batch_idx, sample in enumerate(train_loader):
+            inputs, targets = sample[0].to(device), sample[1].to(device)
             optimizer.zero_grad()
 
             if config.enable_amp:
@@ -90,6 +84,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
 
             # Compute correct, incorrect, memorized
             if config.compute_memorization:
+                original_targets = sample[2].to(device)
                 with torch.no_grad():
                     _, predicted = outputs.max(1)
 
@@ -117,7 +112,7 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             # loss_for_wand_b = float(train_loss/batch_ct)
             wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
             # print(f"Loss after " + str(example_ct).zfill(5) + f" examples: {loss_for_wand_b:.3f}")
-        train_loss_per_epoch.append(train_loss / train_loader.dataset_len)
+        train_loss_per_epoch.append(train_loss / len(train_loader.dataset))#len(train_loader))
         if config.compute_memorization:
             correct_in_clean /= total_clean
             incorrect_in_clean /= total_clean
@@ -139,8 +134,9 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
             test_loss = 0
             with torch.no_grad():
                 correct, total = 0, 0
-                for batch_idx, (inputs, targets, original_targets) in enumerate(test_loader):
-                    inputs, targets, original_targets = inputs.to(device), targets.to(device), original_targets.to(device)
+                for batch_idx, sample in enumerate(test_loader):
+                    inputs, targets = sample[0].to(device), sample[1].to(device)
+                    original_targets = sample[2].to(device) if config.compute_memorization else targets
                     outputs = model(inputs)
                     loss = test_criterion(outputs, targets)
 
@@ -160,14 +156,15 @@ def train(model, criterion, optimizer, n_epochs, train_loader, test_loader=None,
         # anneal learning rate
         scheduler.step()
 
-    return (train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch,
-            correct_clean_per_epoch, incorrect_clean_per_epoch,
-            correct_wrong_per_epoch, memorized_wrong_per_epoch, incorrect_wrong_per_epoch)
-
+    if config.compute_memorization:
+        return (train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch,
+                correct_clean_per_epoch, incorrect_clean_per_epoch,
+                correct_wrong_per_epoch, memorized_wrong_per_epoch, incorrect_wrong_per_epoch)
+    return (train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch)
 
 def plot_learning_curve_and_acc(results, title, path_prefix):
     Path("./results").mkdir(parents=True, exist_ok=True)
-    train_cost, test_cost, test_accuracy, correct_clean, incorrect_clean, correct_wrong, memorized_wrong, incorrect_wrong = results
+    train_cost, test_cost, test_accuracy = results[:3]
     epochs = np.arange(1, len(train_cost) + 1)
     # plot learning curve
     plt.plot(epochs, train_cost)
@@ -188,7 +185,9 @@ def plot_learning_curve_and_acc(results, title, path_prefix):
     plt.savefig(path_prefix + '_acc.pdf')
     plt.show()
 
-    if correct_wrong is not None:
+    if len(results) > 3:
+        # we have more information about noise. Add that
+        correct_clean, incorrect_clean, correct_wrong, memorized_wrong, incorrect_wrong = results[-5:]
         # plot fraction of correct, incorrect, memorized samples in wrong labels
         plt.plot(epochs, correct_wrong)
         plt.plot(epochs, memorized_wrong)
@@ -231,7 +230,7 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
 
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
-    wandb_project = 'resnet-elr-cifar10'
+    wandb_project = 'resnet-ce-cdon'
     wandb_entity = 'dd2424-group9'
     with wandb.init(project=wandb_project, entity=wandb_entity, config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
@@ -245,25 +244,20 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
 
         """load data"""
         print('==> Preparing data..')
-        if config.dataset_name == 'CIFAR10':
-            output_features = 10
-            train_loader, test_loader = datasets.load_cifar10_dataset(batch_size=config.batch_size,
-                                                                      noise_rate=config.noise_rate,
-                                                                      fraction=config.fraction)
-        elif config.dataset_name == 'CIFAR100':
-            output_features = 100
-            train_loader, test_loader = datasets.load_cifar100_dataset(batch_size=config.batch_size,
-                                                                       noise_rate=config.noise_rate,
-                                                                       fraction=config.fraction)
+        if config.dataset_name.startswith('CIFAR'):
+            train_loader, test_loader = datasets.load_cifar_dataset(config.dataset_name,
+                                                                    batch_size=config.batch_size,
+                                                                    noise_rate=config.noise_rate,
+                                                                    fraction=config.fraction)
         elif config.dataset_name == 'CDON':
-            raise NotImplementedError
+            train_loader, test_loader = datasets.load_cdon_dataset(config.batch_size)
         else:
             raise NotImplementedError
 
         """training algorithm"""
         if config['use_ELR']:
             print('--Using ELR--')
-            criterion = trainer_config['criterion'](train_loader.dataset_len, n_classes=output_features, **trainer_config['criterion_params'])
+            criterion = trainer_config['criterion'](len(train_loader.dataset), n_classes=config['classes'], **trainer_config['criterion_params'])
         else:
             print('--Using CE loss--')
             criterion = trainer_config['criterion'](**trainer_config['criterion_params'])
@@ -274,7 +268,7 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
 
         """train model"""
         results = train(
-            model, criterion, optimizer, n_epochs=config.n_epochs, train_loader=train_loader, test_loader=test_loader,
+            model, criterion, optimizer, train_loader=train_loader, test_loader=test_loader,
             scheduler=scheduler, config=config)
 
         """Plot learning curve and accuracy"""
@@ -287,24 +281,25 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
 def main():
     wandb.login()
 
+    # todo: change into dataclass to comply with wandb syntax (we later use wandb.config which is accesed as a dataclass)
     config = dict(
         n_epochs=120,
         batch_size=128,
-        classes=10,
-        noise_rate=0.4,
+        classes=3516,
+        noise_rate=0.0,
         is_symmetric_noise=True,
         fraction=1.0,
-        compute_memorization=True,
-        dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-        model_path='./models/CIFAR10_20.mdl',
-        plot_path='./results/CIFAR10_20',
+        compute_memorization=False,
+        dataset_name='CDON',  # opt: 'CIFAR10', 'CIFAR100', 'CDON'
+        model_path='./models/CDON.mdl',
+        plot_path='./results/CDON',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
         milestones=[40, 80],
         gamma=0.01,
         enable_amp=True,
-        use_ELR=True,
+        use_ELR=False,
         elr_lambda=3.0,
         elr_beta=0.7
 
