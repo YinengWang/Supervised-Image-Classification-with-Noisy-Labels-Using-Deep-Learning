@@ -232,10 +232,12 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
 
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
-    wandb_project = 'ResNet-ELR'
+    wandb_project = 'replicate-cifar10'
     with wandb.init(project=wandb_project, config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
+        if config.run_name is not None:
+            wandb.run.name = config.run_name
 
         """create the model"""
         model = trainer_config['model'](config['classes']).to(device)
@@ -295,6 +297,7 @@ def main():
         is_symmetric_noise=True,
         fraction=1.0,
         compute_memorization=True,
+        run_name=None,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
         plot_path='./results/CIFAR10_20',
@@ -318,10 +321,10 @@ def main():
         'criterion_params': {}
     }
 
-    # use_CosAnneal = {
-    #     'scheduler': optim.lr_scheduler.CosineAnnealingLR,
-    #     'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
-    # }
+    use_cos_anneal = {
+        'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
+        'scheduler_params': {"T_0": 10, "eta_min": 0.001}
+    }
     # trainer_config.update(use_CosAnneal)
 
     if config['use_ELR']:
@@ -331,7 +334,21 @@ def main():
         }
         trainer_config.update(use_ELR)
 
-    model_pipeline(config, trainer_config, loadExistingWeights=False)
+    trainer_config.update(use_cos_anneal)
+    for noise_rate in [0.0, 0.1, 0.15, 0.2]:
+        config['noise_rate'] = noise_rate
+        config['model_path'] = f'./models/CIFAR10_CE_CosAnneal_{noise_rate}.mdl'
+        config['plot_path'] = f'./results/CIFAR10_CE_CosAnneal_{noise_rate}'
+        config['run_name'] = f'CIFAR10_CE_CosAnneal_{noise_rate}'
+        model_pipeline(config, trainer_config, loadExistingWeights=False)
+
+    trainer_config.update({'scheduler': optim.lr_scheduler.MultiStepLR, 'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']}})
+    for noise_rate in [0.0, 0.1, 0.15, 0.2]:
+        config['noise_rate'] = noise_rate
+        config['model_path'] = f'./models/CIFAR10_CE_MultistepAnneal_{noise_rate}.mdl'
+        config['plot_path'] = f'./results/CIFAR10_CE_MultistepAnneal_{noise_rate}'
+        config['run_name'] = f'CIFAR10_CE_MultistepAnneal_{noise_rate}'
+        model_pipeline(config, trainer_config, loadExistingWeights=False)
 
 
 if __name__ == '__main__':
