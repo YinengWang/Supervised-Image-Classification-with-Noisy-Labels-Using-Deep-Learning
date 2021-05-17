@@ -18,6 +18,7 @@ class ELR_loss(nn.Module):
 
     def forward(self, indices, output, label):
         pred = F.softmax(output)
+        pred = torch.clamp(pred, 1e-4, 1.0-1e-4)
 
         ce_loss = F.cross_entropy(output, label)
 
