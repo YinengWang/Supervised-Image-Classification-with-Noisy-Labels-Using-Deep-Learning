@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torch.utils.data._utils import collate
 
-from Custom_dataset import CDONdataset
+from Custom_dataset import CDONdataset, CDONDatasetSplit
 
 from math import ceil
 
@@ -13,6 +13,7 @@ from math import ceil
 KNOWN_NORMALIZATION = {'CIFAR10': ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
                        'CIFAR100': ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
                        'CDON': ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))} # todo: tune the values for CDON
+
 
 class FastTensorDataLoader:
     """
@@ -87,11 +88,11 @@ def load_cdon_dataset(batch_size=128):
 
     root_folder = "/home/dd2424-google/Supervised-Image-Classification-with-Noisy-Labels-Using-Deep-Learning/Datasets/CDON"
     dataset = CDONdataset("dataset_lables.csv", root_folder, transform=transform)
-    trainset_length = int(len(dataset) * 0.7)
-    testset_length = len(dataset) - trainset_length
-    train_set, test_set = torch.utils.data.random_split(dataset, [trainset_length, testset_length])
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
+    train_set = CDONDatasetSplit(dataset, split=0.9, from_bottom=True)
+    test_set = CDONDatasetSplit(dataset, split=0.1, from_bottom=False)
+    assert(len(train_set) + len(test_set) <= len(dataset))
+    train_loader = generate_loader_with_noise(train_set, batch_size=batch_size, shuffle=True, noise_rate=0.0, is_symmetric_noise=True)
+    test_loader = generate_loader_with_noise(test_set, batch_size=batch_size, shuffle=True, noise_rate=0.0, is_symmetric_noise=True)
 
     return train_loader, test_loader
 

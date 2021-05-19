@@ -1,13 +1,9 @@
 import os
 import torch
-import numpy as np
-import matplotlib.pyplot as plt
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
+from torch.utils.data import Dataset
 import pandas as pd
-from matplotlib import image as img
-from skimage import io
 from PIL import Image 
+import math
 
 class CDONdataset(Dataset):
     def __init__(self, csv_file, root_dir, transform=None):
@@ -38,3 +34,29 @@ class CDONdataset(Dataset):
                 image = self.transform(image)
 
         return (image, torch.tensor(y_label))
+
+# Used to split the above dataset into two (possibly for training / testing)
+class CDONDatasetSplit(Dataset):
+    def __init__(self, dataset: Dataset, split, from_bottom=True, samples4category=1000):
+        self.samples4category = samples4category
+        self.original_dataset = dataset
+        self.split = split
+        self.from_bottom = from_bottom
+
+    def __len__(self):
+        if self.from_bottom:
+            return math.floor(len(self.original_dataset) * self.split)
+        return math.ceil(len(self.original_dataset) * self.split)
+
+    def __getitem__(self, index):
+        original_index = math.floor(index / self.samples4category / self.split) * self.samples4category
+        samples_missing = len(self.original_dataset) - original_index * self.samples4category
+        
+        if not self.from_bottom:
+            if samples_missing < self.samples4category:
+                # we are at the end of the dataset
+                original_index += int(samples_missing * (1 - self.split))
+            else:
+                original_index += int(self.samples4category * (1 - self.split))
+        original_index += (index % (self.samples4category * self.split))
+        return self.original_dataset[int(original_index)]

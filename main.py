@@ -51,10 +51,10 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
         total_clean, total_wrong = 0, 0
         correct_in_clean, incorrect_in_clean = 0, 0
         correct_in_wrong, memorized_in_wrong, incorrect_in_wrong = 0, 0, 0
-
         for batch_idx, sample in enumerate(train_loader):
             inputs, targets = sample[0].to(device), sample[1].to(device)
             optimizer.zero_grad()
+            inds = None
 
             if config.enable_amp:
                 scaler = GradScaler()
@@ -281,18 +281,17 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
 def main():
     wandb.login()
 
-    # todo: change into dataclass to comply with wandb syntax (we later use wandb.config which is accesed as a dataclass)
     config = dict(
         n_epochs=120,
         batch_size=128,
-        classes=3516,
+        classes=64, #157 categories for clothing # total subcategories is 3516
         noise_rate=0.0,
         is_symmetric_noise=True,
         fraction=1.0,
         compute_memorization=False,
         dataset_name='CDON',  # opt: 'CIFAR10', 'CIFAR100', 'CDON'
-        model_path='./models/CDON.mdl',
-        plot_path='./results/CDON',
+        model_path='./models/CDON_CE.mdl',
+        plot_path='./results/CDON_CE',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
