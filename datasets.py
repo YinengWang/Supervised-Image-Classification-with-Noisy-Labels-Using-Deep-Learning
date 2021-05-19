@@ -83,7 +83,7 @@ def load_cdon_dataset(batch_size=128):
             transforms.Resize(32),
             transforms.CenterCrop(32),
             transforms.ToTensor(),
-            transforms.Normalize(*KNOWN_NORMALIZATION['CDON']) 
+            transforms.Normalize(*KNOWN_NORMALIZATION['CDON'])
         ])
 
     root_folder = "/home/dd2424-google/Supervised-Image-Classification-with-Noisy-Labels-Using-Deep-Learning/Datasets/CDON"
@@ -127,7 +127,7 @@ def load_cifar_dataset(dataset_name, batch_size=128, noise_rate=0.0, is_symmetri
         transforms.ToTensor(),
         transforms.Normalize(*KNOWN_NORMALIZATION[dataset_name]),
     ])
-    
+
     if dataset_name == "CIFAR10":
         train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
         test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)

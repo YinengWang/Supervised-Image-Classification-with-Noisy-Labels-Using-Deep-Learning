@@ -2,7 +2,7 @@ import os
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-from PIL import Image 
+from PIL import Image
 import math
 
 class CDONdataset(Dataset):
@@ -20,7 +20,7 @@ class CDONdataset(Dataset):
         img_path = os.path.join(self.root_dir, "images", self.annotations.iloc[index, 0])
         with Image.open(img_path).convert('RGB') as image:
             y_wild_label = self.annotations.iloc[index, 2]
-            if y_wild_label == y_wild_label:
+            if y_wild_label is not None:
                 y_label = int(y_wild_label)
             else:
                 y_label = 0
@@ -51,7 +51,7 @@ class CDONDatasetSplit(Dataset):
     def __getitem__(self, index):
         original_index = math.floor(index / self.samples4category / self.split) * self.samples4category
         samples_missing = len(self.original_dataset) - original_index
-        
+
         if not self.from_bottom:
             if samples_missing < self.samples4category:
                 # we are at the end of the dataset

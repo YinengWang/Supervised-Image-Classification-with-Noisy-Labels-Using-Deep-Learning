@@ -281,6 +281,30 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
 def main():
     wandb.login()
 
+    # CIFAR use this
+    config = dict(
+        n_epochs=120,
+        batch_size=128,
+        classes=10,
+        noise_rate=0.4,
+        is_symmetric_noise=True,
+        fraction=1.0,
+        compute_memorization=True,
+        dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
+        model_path='./models/CIFAR10_20.mdl',
+        plot_path='./results/CIFAR10_20',
+        learning_rate=0.02,
+        momentum=0.9,
+        weight_decay=1e-3,
+        milestones=[40, 80],
+        gamma=0.01,
+        enable_amp=True,
+        use_ELR=True,
+        elr_lambda=3.0,
+        elr_beta=0.7
+    )
+
+    # CDON use this
     config = dict(
         n_epochs=120,
         batch_size=128,
@@ -301,7 +325,6 @@ def main():
         use_ELR=False,
         elr_lambda=3.0,
         elr_beta=0.7
-
     )
 
     trainer_config = {
