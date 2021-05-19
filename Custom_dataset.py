@@ -50,7 +50,7 @@ class CDONDatasetSplit(Dataset):
 
     def __getitem__(self, index):
         original_index = math.floor(index / self.samples4category / self.split) * self.samples4category
-        samples_missing = len(self.original_dataset) - original_index * self.samples4category
+        samples_missing = len(self.original_dataset) - original_index
         
         if not self.from_bottom:
             if samples_missing < self.samples4category:
