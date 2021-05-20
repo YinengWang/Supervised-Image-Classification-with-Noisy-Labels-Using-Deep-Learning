@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 
 
-class ELR_loss(nn.Module):
+class ELR_Loss(nn.Module):
     def __init__(self, n_examples, n_classes=10, beta=0.3, lam=3):
-        super(ELR_loss, self).__init__()
+        super(ELR_Loss, self).__init__()
         self.beta = beta  # "beta": 0.7 in authors' cifar10 config file
         self.lam = lam  # "lambda": 3 in authors' cifar10 config file
         self.n_classes = n_classes

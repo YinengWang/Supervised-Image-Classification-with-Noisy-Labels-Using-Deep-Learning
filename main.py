@@ -6,7 +6,7 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 import numpy as np
 
-from loss import ELR_loss
+from loss import ELR_Loss
 from model import ResNet18
 from model import ResNet34
 import datasets
@@ -61,7 +61,7 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
                 with autocast():
                     outputs = model(inputs)
 
-                    if config['use_ELR']:
+                    if config['criterion'] == 'ELR':
                         inds = train_loader.get_indices_in_batch(batch_idx)
                         loss = criterion(inds, outputs, targets)
                     else:
@@ -73,7 +73,7 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
             else:
                 outputs = model(inputs)
 
-                if config['use_ELR']:
+                if config['criterion'] == 'ELR':
                     inds = train_loader.get_indices_in_batch(batch_idx)
                     loss = criterion(inds, outputs, targets)
                 else:
@@ -232,7 +232,7 @@ def model_pipeline(config, loadExistingWeights=False):
     # Start wandb
     wandb_project = 'resnet-ce-cdon'
     wandb_entity = 'dd2424-group9'
-    with wandb.init(project=wandb_project, entity=wandb_entity, config=config):
+    with wandb.init(project=wandb_project, entity=wandb_entity, config=config, mode='offline'):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
 
@@ -260,17 +260,25 @@ def model_pipeline(config, loadExistingWeights=False):
             raise NotImplementedError
 
         """training algorithm"""
-        if config['use_ELR']:
+        if config['criterion'] == 'ELR':
             print('--Using ELR--')
-            criterion = config['criterion'](len(train_loader.dataset), n_classes=config['classes'],
-                                            **config['criterion_params'])
-        else:
+            criterion = ELR_Loss(len(train_loader.dataset), n_classes=config['classes'],
+                                 beta=config['elr_beta'], lam=config['elr_lambda'])
+        elif config['criterion'] == 'CE':
             print('--Using CE loss--')
-            criterion = config['criterion'](**config['criterion_params'])
+            criterion = torch.nn.CrossEntropyLoss()
+        else:
+            raise NotImplementedError
 
         optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
                               weight_decay=config.weight_decay)
-        scheduler = config['scheduler'](optimizer, **config['scheduler_params'])
+
+        if config['scheduler'] == 'MultiStepLR':
+            scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config['milestones'], gamma=config['gamma'])
+        elif config['scheduler'] == 'CosAnneal':
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, eta_min=0.001)
+        else:
+            raise NotImplementedError
 
         """train model"""
         results = train(model, criterion, optimizer, train_loader=train_loader, test_loader=test_loader,
@@ -284,16 +292,16 @@ def model_pipeline(config, loadExistingWeights=False):
 
 
 def main():
-    wandb.login()
+    # wandb.login()
 
     # CIFAR use this
     hyperparameter_defaults = dict(
-        n_epochs=120,
+        n_epochs=2,
         batch_size=128,
         classes=10,
         noise_rate=0.4,
         is_symmetric_noise=True,
-        fraction=1.0,
+        fraction=0.1,
         compute_memorization=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
@@ -304,15 +312,13 @@ def main():
         milestones=[40, 80],
         gamma=0.01,
         enable_amp=True,
-        use_ELR=True,
         elr_lambda=3.0,
         elr_beta=0.7,
         model='ResNet34',
         optimizer=optim.SGD,
         optimizer_params=None,
-        scheduler=optim.lr_scheduler.MultiStepLR,
-        criterion=torch.nn.CrossEntropyLoss,
-        criterion_params={}
+        scheduler='MultiStepLR', # or CosAnneal
+        criterion='ELR',
     )
 
     # # CDON use this
@@ -339,27 +345,10 @@ def main():
     # )
 
 
-    # use_CosAnneal = {
-    #     'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
-    #     'scheduler_params': {"T_0": 10, "eta_min": 0.001},
-    #     # 'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
-    # }
-    # config.update(use_CosAnneal)
-
     hyperparameter_defaults['optimizer_params'] = {'lr': hyperparameter_defaults['learning_rate'],
                                                    'momentum': hyperparameter_defaults['momentum'],
                                                    'weight_decay': hyperparameter_defaults['weight_decay']}
-    hyperparameter_defaults['scheduler_params'] = {'milestones': hyperparameter_defaults['milestones'],
-                                                   'gamma': hyperparameter_defaults['gamma']},
 
-
-    if hyperparameter_defaults['use_ELR']:
-        use_ELR = {
-            'criterion': ELR_loss,
-            'criterion_params': {'beta': hyperparameter_defaults['elr_beta'],
-                                 'lam': hyperparameter_defaults['elr_lambda']}
-        }
-        hyperparameter_defaults.update(use_ELR)
 
     model_pipeline(hyperparameter_defaults, loadExistingWeights=False)
 
