@@ -270,8 +270,9 @@ def model_pipeline(config, loadExistingWeights=False):
         else:
             raise NotImplementedError
 
-        optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
-                              weight_decay=config.weight_decay)
+        if config['optimizer'] == 'SGD':
+            optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
+                                  weight_decay=config.weight_decay)
 
         if config['scheduler'] == 'MultiStepLR':
             scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config['milestones'], gamma=config['gamma'])
@@ -315,7 +316,7 @@ def main():
         elr_lambda=3.0,
         elr_beta=0.7,
         model='ResNet34',
-        optimizer=optim.SGD,
+        optimizer='SGD',
         optimizer_params=None,
         scheduler='MultiStepLR', # or CosAnneal
         criterion='ELR',
