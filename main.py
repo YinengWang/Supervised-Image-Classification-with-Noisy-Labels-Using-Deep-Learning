@@ -107,10 +107,10 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
             example_ct += len(inputs)
             batch_ct += 1
 
-            # log loss on WandB every 25 steps
-            # if ((batch_ct + 1) % 25) == 0:
+            # log loss on WandB every 5 steps
+            if ((batch_ct + 1) % 5) == 0:
             # loss_for_wand_b = float(train_loss/batch_ct)
-            wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
+                wandb.log({"epoch": epoch, "loss": loss_batch}, step=batch_ct)
             # print(f"Loss after " + str(example_ct).zfill(5) + f" examples: {loss_for_wand_b:.3f}")
         train_loss_per_epoch.append(train_loss / len(train_loader.dataset))#len(train_loader))
         if config.compute_memorization:
