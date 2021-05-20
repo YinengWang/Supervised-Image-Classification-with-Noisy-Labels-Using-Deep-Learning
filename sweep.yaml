@@ -1,0 +1,12 @@
+program: main.py
+method: random
+metric:
+  name: test_accuracy
+  goal: maximize
+parameters:
+  learning_rate:
+    values: [0.1, 0.01]
+  optimizer:
+    values: ['SGD', 'Adam']
+  scheduler:
+    values: ['MultiStepLR', 'CosAnneal']

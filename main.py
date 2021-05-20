@@ -230,17 +230,18 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
 
 def model_pipeline(config, loadExistingWeights=False):
     # Start wandb
+    # disabled for sweep
     wandb_project = 'resnet-ce-cdon'
     wandb_entity = 'dd2424-group9'
-    with wandb.init(project=wandb_project, entity=wandb_entity, config=config, mode='offline'):
+    with wandb.init(config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
 
         """create the model"""
-        if config['model'] == 'ResNet18':
-            model = ResNet18(config['classes']).to(device)
-        elif config['model'] == 'ResNet34':
-            model = ResNet34(config['classes']).to(device)
+        if config.model == 'ResNet18':
+            model = ResNet18(config.classes).to(device)
+        elif config.model == 'ResNet34':
+            model = ResNet34(config.classes).to(device)
         else:
             raise NotImplementedError
 
@@ -260,23 +261,30 @@ def model_pipeline(config, loadExistingWeights=False):
             raise NotImplementedError
 
         """training algorithm"""
-        if config['criterion'] == 'ELR':
+        # check CE or ELR
+        if config.criterion == 'ELR':
             print('--Using ELR--')
-            criterion = ELR_Loss(len(train_loader.dataset), n_classes=config['classes'],
-                                 beta=config['elr_beta'], lam=config['elr_lambda'])
-        elif config['criterion'] == 'CE':
+            criterion = ELR_Loss(len(train_loader.dataset), n_classes=config.classes,
+                                 beta=config.elr_beta, lam=config.elr_lambda)
+        elif config.criterion == 'CE':
             print('--Using CE loss--')
             criterion = torch.nn.CrossEntropyLoss()
         else:
             raise NotImplementedError
 
-        if config['optimizer'] == 'SGD':
+        # check if SGD or Adam
+        if config.optimizer == 'SGD':
             optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
                                   weight_decay=config.weight_decay)
+        elif config.optimizer == 'Adam':
+            optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+        else:
+            raise NotImplementedError
 
-        if config['scheduler'] == 'MultiStepLR':
-            scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config['milestones'], gamma=config['gamma'])
-        elif config['scheduler'] == 'CosAnneal':
+        # check if MS or CA
+        if config.scheduler == 'MultiStepLR':
+            scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config.milestones, gamma=config.gamma)
+        elif config.scheduler == 'CosAnneal':
             scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, eta_min=0.001)
         else:
             raise NotImplementedError
@@ -293,7 +301,7 @@ def model_pipeline(config, loadExistingWeights=False):
 
 
 def main():
-    # wandb.login()
+    wandb.login()
 
     # CIFAR use this
     hyperparameter_defaults = dict(
@@ -344,11 +352,6 @@ def main():
     #     elr_lambda=3.0,
     #     elr_beta=0.7
     # )
-
-
-    hyperparameter_defaults['optimizer_params'] = {'lr': hyperparameter_defaults['learning_rate'],
-                                                   'momentum': hyperparameter_defaults['momentum'],
-                                                   'weight_decay': hyperparameter_defaults['weight_decay']}
 
 
     model_pipeline(hyperparameter_defaults, loadExistingWeights=False)
