@@ -305,12 +305,12 @@ def main():
 
     # CIFAR use this
     hyperparameter_defaults = dict(
-        n_epochs=2,
+        n_epochs=50,
         batch_size=128,
         classes=10,
-        noise_rate=0.4,
+        noise_rate=0.1,
         is_symmetric_noise=True,
-        fraction=0.1,
+        fraction=1.0,
         compute_memorization=True,
         dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
         model_path='./models/CIFAR10_20.mdl',
