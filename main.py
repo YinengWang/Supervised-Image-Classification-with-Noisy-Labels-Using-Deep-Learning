@@ -160,7 +160,7 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
         return (train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch,
                 correct_clean_per_epoch, incorrect_clean_per_epoch,
                 correct_wrong_per_epoch, memorized_wrong_per_epoch, incorrect_wrong_per_epoch)
-    return (train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch)
+    return train_loss_per_epoch, test_loss_per_epoch, accuracy_per_epoch
 
 def plot_learning_curve_and_acc(results, title, path_prefix):
     Path("./results").mkdir(parents=True, exist_ok=True)
@@ -228,7 +228,7 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
         })
 
 
-def model_pipeline(config, trainer_config, loadExistingWeights=False):
+def model_pipeline(config, loadExistingWeights=False):
     # Start wandb
     wandb_project = 'resnet-ce-cdon'
     wandb_entity = 'dd2424-group9'
@@ -237,7 +237,12 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         config = wandb.config
 
         """create the model"""
-        model = trainer_config['model'](config['classes']).to(device)
+        if config['model'] == 'ResNet18':
+            model = ResNet18(config['classes']).to(device)
+        elif config['model'] == 'ResNet34':
+            model = ResNet34(config['classes']).to(device)
+        else:
+            raise NotImplementedError
 
         if loadExistingWeights:
             model.load_state_dict(torch.load(config.model_path))
@@ -257,19 +262,19 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
         """training algorithm"""
         if config['use_ELR']:
             print('--Using ELR--')
-            criterion = trainer_config['criterion'](len(train_loader.dataset), n_classes=config['classes'], **trainer_config['criterion_params'])
+            criterion = config['criterion'](len(train_loader.dataset), n_classes=config['classes'],
+                                            **config['criterion_params'])
         else:
             print('--Using CE loss--')
-            criterion = trainer_config['criterion'](**trainer_config['criterion_params'])
+            criterion = config['criterion'](**config['criterion_params'])
 
         optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
                               weight_decay=config.weight_decay)
-        scheduler = trainer_config['scheduler'](optimizer, **trainer_config['scheduler_params'])
+        scheduler = config['scheduler'](optimizer, **config['scheduler_params'])
 
         """train model"""
-        results = train(
-            model, criterion, optimizer, train_loader=train_loader, test_loader=test_loader,
-            scheduler=scheduler, config=config)
+        results = train(model, criterion, optimizer, train_loader=train_loader, test_loader=test_loader,
+                        scheduler=scheduler, config=config)
 
         """Plot learning curve and accuracy"""
         plot_title = f'{config.dataset_name}, noise_level={config.noise_rate}'
@@ -282,7 +287,7 @@ def main():
     wandb.login()
 
     # CIFAR use this
-    config = dict(
+    hyperparameter_defaults = dict(
         n_epochs=120,
         batch_size=128,
         classes=10,
@@ -301,58 +306,62 @@ def main():
         enable_amp=True,
         use_ELR=True,
         elr_lambda=3.0,
-        elr_beta=0.7
+        elr_beta=0.7,
+        model='ResNet34',
+        optimizer=optim.SGD,
+        optimizer_params=None,
+        scheduler=optim.lr_scheduler.MultiStepLR,
+        criterion=torch.nn.CrossEntropyLoss,
+        criterion_params={}
     )
 
-    # CDON use this
-    config = dict(
-        n_epochs=120,
-        batch_size=128,
-        classes=64, #157 categories for clothing # total subcategories is 3516
-        noise_rate=0.0,
-        is_symmetric_noise=True,
-        fraction=1.0,
-        compute_memorization=False,
-        dataset_name='CDON',  # opt: 'CIFAR10', 'CIFAR100', 'CDON'
-        model_path='./models/CDON_CE.mdl',
-        plot_path='./results/CDON_CE',
-        learning_rate=0.02,
-        momentum=0.9,
-        weight_decay=1e-3,
-        milestones=[40, 80],
-        gamma=0.01,
-        enable_amp=True,
-        use_ELR=False,
-        elr_lambda=3.0,
-        elr_beta=0.7
-    )
+    # # CDON use this
+    # config = dict(
+    #     n_epochs=120,
+    #     batch_size=128,
+    #     classes=64, #157 categories for clothing # total subcategories is 3516
+    #     noise_rate=0.0,
+    #     is_symmetric_noise=True,
+    #     fraction=1.0,
+    #     compute_memorization=False,
+    #     dataset_name='CDON',  # opt: 'CIFAR10', 'CIFAR100', 'CDON'
+    #     model_path='./models/CDON_CE.mdl',
+    #     plot_path='./results/CDON_CE',
+    #     learning_rate=0.02,
+    #     momentum=0.9,
+    #     weight_decay=1e-3,
+    #     milestones=[40, 80],
+    #     gamma=0.01,
+    #     enable_amp=True,
+    #     use_ELR=False,
+    #     elr_lambda=3.0,
+    #     elr_beta=0.7
+    # )
 
-    trainer_config = {
-        'model': ResNet34,
-        'optimizer': optim.SGD,
-        'optimizer_params': {'lr': config['learning_rate'], 'momentum': config['momentum'],
-                             'weight_decay': config['weight_decay']},
-        'scheduler': optim.lr_scheduler.MultiStepLR,
-        'scheduler_params': {'milestones': config['milestones'], 'gamma': config['gamma']},
-        'criterion': torch.nn.CrossEntropyLoss,
-        'criterion_params': {}
-    }
 
     # use_CosAnneal = {
     #     'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
     #     'scheduler_params': {"T_0": 10, "eta_min": 0.001},
     #     # 'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
     # }
-    # trainer_config.update(use_CosAnneal)
+    # config.update(use_CosAnneal)
 
-    if config['use_ELR']:
+    hyperparameter_defaults['optimizer_params'] = {'lr': hyperparameter_defaults['learning_rate'],
+                                                   'momentum': hyperparameter_defaults['momentum'],
+                                                   'weight_decay': hyperparameter_defaults['weight_decay']}
+    hyperparameter_defaults['scheduler_params'] = {'milestones': hyperparameter_defaults['milestones'],
+                                                   'gamma': hyperparameter_defaults['gamma']},
+
+
+    if hyperparameter_defaults['use_ELR']:
         use_ELR = {
             'criterion': ELR_loss,
-            'criterion_params': {'beta': config['elr_beta'], 'lam': config['elr_lambda']}
+            'criterion_params': {'beta': hyperparameter_defaults['elr_beta'],
+                                 'lam': hyperparameter_defaults['elr_lambda']}
         }
-        trainer_config.update(use_ELR)
+        hyperparameter_defaults.update(use_ELR)
 
-    model_pipeline(config, trainer_config, loadExistingWeights=False)
+    model_pipeline(hyperparameter_defaults, loadExistingWeights=False)
 
 
 if __name__ == '__main__':
