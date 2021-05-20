@@ -5,7 +5,7 @@ metric:
   goal: maximize
 parameters:
   learning_rate:
-    values: [0.001, 0.1]
+    values: [0.001, 0.03]
   optimizer:
     values: ['SGD', 'Adam']
   scheduler:
