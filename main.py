@@ -320,17 +320,44 @@ def main():
     wandb.login()
 
     # CIFAR use this
+    # hyperparameter_defaults = dict(
+    #     n_epochs=50,
+    #     batch_size=128,
+    #     classes=100,
+    #     noise_rate=0.0,
+    #     is_symmetric_noise=True,
+    #     fraction=1.0,
+    #     compute_memorization=True,
+    #     dataset_name='CIFAR100',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
+    #     model_path='./models/CIFAR100_0.mdl',
+    #     plot_path='./results/CIFAR100_0',
+    #     learning_rate=0.02,
+    #     momentum=0.9,
+    #     weight_decay=1e-3,
+    #     milestones=[40, 80],
+    #     gamma=0.01,
+    #     enable_amp=False,
+    #     elr_lambda=3.0,
+    #     elr_beta=0.7,
+    #     model='ResNet34',
+    #     optimizer='SGD',
+    #     optimizer_params=None,
+    #     scheduler='CosAnneal', # or CosAnneal
+    #     criterion='ELR',
+    # )
+
+    # CDON use this
     hyperparameter_defaults = dict(
         n_epochs=50,
         batch_size=128,
-        classes=100,
+        classes=64,
         noise_rate=0.0,
         is_symmetric_noise=True,
         fraction=1.0,
-        compute_memorization=True,
-        dataset_name='CIFAR100',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-        model_path='./models/CIFAR100_0.mdl',
-        plot_path='./results/CIFAR100_0',
+        compute_memorization=False,
+        dataset_name='CDON',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
+        model_path='./models/CDON_ELR.mdl',
+        plot_path='./results/CDON_ELR',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
@@ -346,7 +373,6 @@ def main():
         criterion='ELR',
     )
 
-    # # CDON use this
     # config = dict(
     #     n_epochs=120,
     #     batch_size=128,
