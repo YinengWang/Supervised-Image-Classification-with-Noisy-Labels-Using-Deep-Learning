@@ -330,7 +330,7 @@ def main():
 
     # CDON use this
     hyperparameter_defaults = dict(
-        n_epochs=50,
+        n_epochs=40,
         batch_size=128,
         classes=64,
         noise_rate=0.0,
