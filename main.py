@@ -16,6 +16,9 @@ from pathlib import Path
 import wandb
 import csv
 
+from sam import SAM
+
+
 # set global env variable
 if torch.cuda.is_available():
     print('GPU is enabled!')
@@ -71,6 +74,7 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
                 scaler.step(optimizer)
                 scaler.update()
             else:
+                # first pass
                 outputs = model(inputs)
 
                 if config['criterion'] == 'ELR':
@@ -80,7 +84,19 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
                     loss = criterion(outputs, targets)
 
                 loss.backward()
-                optimizer.step()
+                optimizer.first_step(zero_grad=True)
+
+                # second pass
+                outputs = model(inputs)
+
+                if config['criterion'] == 'ELR':
+                    inds = train_loader.get_indices_in_batch(batch_idx)
+                    loss = criterion(inds, outputs, targets)
+                else:
+                    loss = criterion(outputs, targets)
+
+                loss.backward()
+                optimizer.second_step(zero_grad=True)
 
             # Compute correct, incorrect, memorized
             if config.compute_memorization:
@@ -271,13 +287,15 @@ def model_pipeline(config, loadExistingWeights=False):
             raise NotImplementedError
 
         # check if SGD or Adam
-        if config.optimizer == 'SGD':
-            optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
-                                  weight_decay=config.weight_decay)
-        elif config.optimizer == 'Adam':
-            optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
-        else:
-            raise NotImplementedError
+        base_optimizer = torch.optim.SGD
+        optimizer = SAM(model.parameters(), base_optimizer, lr=0.1, momentum=0.9)
+        # if config.optimizer == 'SGD':
+        #     optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
+        #                           weight_decay=config.weight_decay)
+        # elif config.optimizer == 'Adam':
+        #     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+        # else:
+        #     raise NotImplementedError
 
         # check if MS or CA
         if config.scheduler == 'MultiStepLR':
@@ -305,26 +323,26 @@ def main():
     hyperparameter_defaults = dict(
         n_epochs=50,
         batch_size=128,
-        classes=10,
-        noise_rate=0.1,
+        classes=100,
+        noise_rate=0.0,
         is_symmetric_noise=True,
-        fraction=1.0,
+        fraction=0.1,
         compute_memorization=True,
-        dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-        model_path='./models/CIFAR10_20.mdl',
-        plot_path='./results/CIFAR10_20',
+        dataset_name='CIFAR100',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
+        model_path='./models/CIFAR100_0.mdl',
+        plot_path='./results/CIFAR100_0',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
         milestones=[40, 80],
         gamma=0.01,
-        enable_amp=True,
+        enable_amp=False,
         elr_lambda=3.0,
         elr_beta=0.7,
         model='ResNet34',
         optimizer='SGD',
         optimizer_params=None,
-        scheduler='MultiStepLR', # or CosAnneal
+        scheduler='CosAnneal', # or CosAnneal
         criterion='ELR',
     )
 
