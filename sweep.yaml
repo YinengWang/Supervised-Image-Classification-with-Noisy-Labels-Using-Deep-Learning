@@ -1,26 +1,18 @@
 program: main.py
-method: random
+method: grid
 metric:
   name: test_accuracy
   goal: maximize
 parameters:
   learning_rate:
-    distribution: log_uniform
-    min: -6.9
-    max: -3.5
+    values: [0.0003, 0.001, 0.003, 0.01, 0.03]
   optimizer:
     values: ['SGD', 'Adam']
   scheduler:
     values: ['MultiStepLR', 'CosAnneal']
   momentum:
-    distribution: uniform
-    min: 0.9
-    max: 0.99
+    values: [0.95, 0.9, 0.85]
   weight_decay:
-    distribution: uniform
-    min: 1e-5
-    max: 1e-2
+    values: [2e-3, 4e-3, 6e-3]
   elr_lambda:
-    distribution: log_uniform
-    min: -1
-    max: 1.6
+    values: [3.0, 3.2, 3.4, 3.6, 3.8]
