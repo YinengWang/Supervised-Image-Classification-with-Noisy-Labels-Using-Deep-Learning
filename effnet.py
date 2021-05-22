@@ -17,6 +17,8 @@ from loss import ELR_Loss
 from model import ResNet18
 from model import ResNet34
 import datasets
+from efficientnet_pytorch import EfficientNet
+
 
 import os.path
 from pathlib import Path
@@ -155,8 +157,8 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
 
                 wandb.log({"test_loss": test_loss / total, "test_accuracy": correct / total}, step=batch_ct)
                 print(f"Test loss after " + str(example_ct).zfill(5) + f" examples: {test_loss / total:.3f}")
-                torch.onnx.export(model, inputs, "model.onnx")
-                wandb.save("model.onnx")
+                #torch.onnx.export(model, inputs, "model.onnx")
+                #wandb.save("model.onnx")
 
         # anneal learning rate
         scheduler.step()
@@ -238,7 +240,7 @@ def model_pipeline(config, loadExistingWeights=False):
     # disabled for sweep
     wandb_project = 'resnet-ce-cdon'
     wandb_entity = 'dd2424-group9'
-    with wandb.init(config=config, mode='offline'):
+    with wandb.init(config=config):
         # access all hyperparameters through wandb.config, so logging matches execution!
         config = wandb.config
 
@@ -249,15 +251,17 @@ def model_pipeline(config, loadExistingWeights=False):
             model = ResNet34(config.classes).to(device)
         else:
             print('transfer')
-
-            model = models.resnet50(pretrained=True).to(device)
-            for param in model.parameters():
-                param.requires_grad = False
-
-            model.fc = nn.Sequential(
-                nn.Linear(2048, 128),
-                nn.ReLU(inplace=True),
-                nn.Linear(128, 64)).to(device)
+            model = EfficientNet.from_pretrained('efficientnet-b1', num_classes=64)
+            model = model.to(device)
+            #
+            # # model = models.resnet50(pretrained=True).to(device)
+            # for param in model.parameters():
+            #     param.requires_grad = False
+            #
+            # model.fc = nn.Sequential(
+            #     nn.Linear(2048, 128),
+            #     nn.ReLU(inplace=True),
+            #     nn.Linear(128, 64)).to(device)
 
             pass
 
@@ -365,10 +369,10 @@ def main():
         milestones=[40, 80],
         gamma=0.01,
         enable_amp=False,
-        elr_lambda=3.0,
+        elr_lambda=4.0,
         elr_beta=0.7,
         model='transfer',
-        optimizer='Adam',
+        optimizer='SGD',
         optimizer_params=None,
         scheduler='CosAnneal', # or CosAnneal
         criterion='ELR',

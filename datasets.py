@@ -86,7 +86,7 @@ def load_cdon_dataset(batch_size=128):
             transforms.Normalize(*KNOWN_NORMALIZATION['CDON'])
         ])
 
-    root_folder = "../Datasets/CDON"
+    root_folder = "/home/karlemstrand/sweep/Datasets/CDON"
     dataset = CDONdataset("dataset_lables.csv", root_folder, transform=transform)
     train_set = CDONDatasetSplit(dataset, split=0.9, from_bottom=True)
     test_set = CDONDatasetSplit(dataset, split=0.1, from_bottom=False)
