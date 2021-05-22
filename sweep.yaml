@@ -14,7 +14,7 @@ parameters:
     values: ['MultiStepLR', 'CosAnneal']
   momentum:
     distribution: uniform
-    min: 0.6
+    min: 0.9
     max: 0.99
   weight_decay:
     distribution: uniform
@@ -22,9 +22,5 @@ parameters:
     max: 1e-2
   elr_lambda:
     distribution: log_uniform
-    min: 0
+    min: -1
     max: 1.6
-  elr_beta:
-    distribution: uniform
-    min: 0.5
-    max: 0.99

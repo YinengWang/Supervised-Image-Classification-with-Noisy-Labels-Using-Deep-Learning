@@ -275,7 +275,7 @@ def model_pipeline(config, loadExistingWeights=False):
             optimizer = optim.SGD(model.parameters(), lr=config.learning_rate, momentum=config.momentum,
                                   weight_decay=config.weight_decay)
         elif config.optimizer == 'Adam':
-            optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            optimizer = optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
         else:
             raise NotImplementedError
 
@@ -347,7 +347,7 @@ def main():
         gamma=0.01,
         enable_amp=False,
         elr_lambda=3.0,
-        elr_beta=0.7,
+        elr_beta=0.85,
         model='ResNet34',
         optimizer='SGD',
         optimizer_params=None,

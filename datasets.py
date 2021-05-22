@@ -10,9 +10,16 @@ from Custom_dataset import CDONdataset, CDONDatasetSplit
 from math import ceil
 
 # The mean and variance used for the normalization
+
+#CDON
+# train_loader.dataset.mean(axis=(0, 2, 3))/255
+# tensor([0.0036, 0.0038, 0.0040])
+# train_loader.dataset.std(axis=(0, 2, 3))/255
+# tensor([0.0043, 0.0046, 0.0044])
+
 KNOWN_NORMALIZATION = {'CIFAR10': ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
                        'CIFAR100': ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
-                       'CDON': ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))} # todo: tune the values for CDON
+                       'CDON': ((0.0036, 0.0038, 0.0040), (0.0043, 0.0046, 0.0044))}
 
 
 class FastTensorDataLoader:
