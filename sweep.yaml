@@ -5,14 +5,12 @@ metric:
   goal: maximize
 parameters:
   learning_rate:
-    values: [0.0003, 0.001, 0.003, 0.01, 0.03]
+    values: [0.001, 0.003, 0.01, 0.03]
   optimizer:
     values: ['SGD', 'Adam']
-  scheduler:
-    values: ['MultiStepLR', 'CosAnneal']
   momentum:
     values: [0.95, 0.9, 0.85]
   weight_decay:
     values: [2e-3, 4e-3, 6e-3]
   elr_lambda:
-    values: [3.0, 3.2, 3.4, 3.6, 3.8]
+    values: [3.2, 3.4, 3.6, 3.8]
