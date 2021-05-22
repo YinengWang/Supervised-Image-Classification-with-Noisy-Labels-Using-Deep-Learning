@@ -12,6 +12,8 @@ class CDONdataset(Dataset):
         self.transform = transform
         csv_path = os.path.join(self.root_dir, csv_file)
         self.annotations = pd.read_csv(csv_path, delimiter=',', header=None)
+        # shuffle data
+        self.annotations = self.annotations.sample(frac = 1)
 
     def __len__(self):
         return int(len(self.annotations))
