@@ -22,8 +22,8 @@ parameters:
     max: 1e-2
   elr_lambda:
     distribution: log_uniform
-    min: -2.3
-    max: 1.09
+    min: 0
+    max: 1.6
   elr_beta:
     distribution: uniform
     min: 0.5
