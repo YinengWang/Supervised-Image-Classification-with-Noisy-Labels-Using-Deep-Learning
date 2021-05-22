@@ -148,8 +148,8 @@ def train(model, criterion, optimizer, train_loader, test_loader=None, scheduler
 
                 wandb.log({"test_loss": test_loss / total, "test_accuracy": correct / total}, step=batch_ct)
                 print(f"Test loss after " + str(example_ct).zfill(5) + f" examples: {test_loss / total:.3f}")
-                torch.onnx.export(model, inputs, "model.onnx")
-                wandb.save("model.onnx")
+                #torch.onnx.export(model, inputs, "model.onnx")
+                #wandb.save("model.onnx")
 
         # anneal learning rate
         scheduler.step()
