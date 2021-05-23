@@ -4,8 +4,8 @@ import torchvision
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torch.utils.data._utils import collate
-from matplotlib import pyplot as plt
-from Custom_dataset import CDONdataset, CDONDatasetSplit, CDONdatasetManualTest
+
+from Custom_dataset import CDONdataset, CDONDatasetSplit
 
 from math import ceil
 
@@ -90,33 +90,11 @@ def load_cdon_dataset(batch_size=128):
     dataset = CDONdataset("dataset_lables.csv", root_folder, transform=transform)
     train_set = CDONDatasetSplit(dataset, split=0.9, from_bottom=True)
     test_set = CDONDatasetSplit(dataset, split=0.1, from_bottom=False)
-
     assert(len(train_set) + len(test_set) <= len(dataset))
-    # trainset_length = int(len(dataset) * 0.7)
-    # testset_length = len(dataset) - trainset_length
-    # train_set, test_set = torch.utils.data.random_split(dataset, [trainset_length, testset_length])
-    # train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=False)
-    # test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
-    train_loader = generate_loader_with_noise(train_set, batch_size=batch_size, shuffle=False, noise_rate=0.0, is_symmetric_noise=True)
-    test_loader = generate_loader_with_noise(test_set, batch_size=batch_size, shuffle=False, noise_rate=0.0, is_symmetric_noise=True)
+    train_loader = generate_loader_with_noise(train_set, batch_size=batch_size, shuffle=True, noise_rate=0.0, is_symmetric_noise=True)
+    test_loader = generate_loader_with_noise(test_set, batch_size=batch_size, shuffle=True, noise_rate=0.0, is_symmetric_noise=True)
 
     return train_loader, test_loader
-
-def load_cdon_dataset_testonly():
-    # Data
-    transform = transforms.Compose([
-            transforms.Resize(32),
-            transforms.CenterCrop(32),
-            transforms.ToTensor(),
-            transforms.Normalize(*KNOWN_NORMALIZATION['CDON']) 
-        ])
-    print('==> Preparing CDON data.. for manual testing')
-
-    root_folder = "/home/dd2424-google/Supervised-Image-Classification-with-Noisy-Labels-Using-Deep-Learning/Datasets/CDON"
-    dataset = CDONdatasetManualTest("dataset_lables.csv", root_folder, transform=transform)
-    test_set = CDONDatasetSplit(dataset, split=0.1, from_bottom=False)
-
-    return DataLoader(test_set, batch_size=1), dataset.label2id
 
 
 def generate_loader_with_noise(dataset, batch_size, shuffle, noise_rate, is_symmetric_noise):
@@ -149,7 +127,7 @@ def load_cifar_dataset(dataset_name, batch_size=128, noise_rate=0.0, is_symmetri
         transforms.ToTensor(),
         transforms.Normalize(*KNOWN_NORMALIZATION[dataset_name]),
     ])
-
+    
     if dataset_name == "CIFAR10":
         train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
         test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)

@@ -20,7 +20,7 @@ class CDONdataset(Dataset):
         img_path = os.path.join(self.root_dir, "images", self.annotations.iloc[index, 0])
         with Image.open(img_path).convert('RGB') as image:
             y_wild_label = self.annotations.iloc[index, 2]
-            if y_wild_label is not None:
+            if y_wild_label == y_wild_label:
                 y_label = int(y_wild_label)
             else:
                 y_label = 0
@@ -32,9 +32,6 @@ class CDONdataset(Dataset):
             # y_label = torch.tensor(int(self.annotations.iloc[index, 1])) - 1 # this is the main category
             if self.transform:
                 image = self.transform(image)
-            else:
-                image.save("test_on_this.jpg")
-                image = None
 
         return (image, torch.tensor(y_label))
 
@@ -49,13 +46,11 @@ class CDONDatasetSplit(Dataset):
     def __len__(self):
         if self.from_bottom:
             return math.floor(len(self.original_dataset) * self.split)
-
         return math.ceil(len(self.original_dataset) * self.split)
 
     def __getitem__(self, index):
         original_index = math.floor(index / self.samples4category / self.split) * self.samples4category
         samples_missing = len(self.original_dataset) - original_index
-
         if not self.from_bottom:
             if samples_missing < self.samples4category:
                 # we are at the end of the dataset
@@ -64,37 +59,3 @@ class CDONDatasetSplit(Dataset):
                 original_index += int(self.samples4category * (1 - self.split))
         original_index += (index % (self.samples4category * self.split))
         return self.original_dataset[int(original_index)]
-
-class CDONdatasetManualTest(Dataset):
-    def __init__(self, csv_file, root_dir, transform=None):
-        self.sublabels_mapping = {} # the sublabels have an arbitrary number, use this to enumerate them
-        self.label2id = {} # the reverse of above mapping
-        self.root_dir = root_dir
-        self.transform = transform
-        csv_path = os.path.join(self.root_dir, csv_file)
-        self.annotations = pd.read_csv(csv_path, delimiter=',', header=None)
-
-    def __len__(self):
-        return int(len(self.annotations))
-
-    def __getitem__(self, index):
-        img_path = os.path.join(self.root_dir, "images", self.annotations.iloc[index, 0])
-        with Image.open(img_path).convert('RGB') as image:
-            y_wild_label = self.annotations.iloc[index, 2]
-            if y_wild_label == y_wild_label:
-                y_label = int(y_wild_label)
-            else:
-                y_label = 0
-            if not y_label in self.sublabels_mapping:
-                self.sublabels_mapping[y_label] = len(self.sublabels_mapping) + 1
-                self.label2id[len(self.sublabels_mapping)] = y_label
-                y_label = len(self.sublabels_mapping)
-
-            else:
-                y_label = self.sublabels_mapping[y_label]
-            # y_label = torch.tensor(int(self.annotations.iloc[index, 1])) - 1 # this is the main category
-            if self.transform:
-                image.save("test_on_this.jpg")
-                image = self.transform(image)
-
-        return (image, torch.tensor(y_label))
