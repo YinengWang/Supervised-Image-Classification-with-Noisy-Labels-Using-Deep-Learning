@@ -12,7 +12,7 @@ from math import ceil
 # The mean and variance used for the normalization
 KNOWN_NORMALIZATION = {'CIFAR10': ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
                        'CIFAR100': ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
-                       'CDON': ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))} # todo: tune the values for CDON
+                       'CDON': ((0.0036, 0.0038, 0.0040), (0.0043, 0.0046, 0.0044))}
 
 
 class FastTensorDataLoader:
@@ -127,7 +127,7 @@ def load_cifar_dataset(dataset_name, batch_size=128, noise_rate=0.0, is_symmetri
         transforms.ToTensor(),
         transforms.Normalize(*KNOWN_NORMALIZATION[dataset_name]),
     ])
-
+    
     if dataset_name == "CIFAR10":
         train_data = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
         test_data = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)

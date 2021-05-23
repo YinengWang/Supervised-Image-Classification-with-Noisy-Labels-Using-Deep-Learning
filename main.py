@@ -227,7 +227,6 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
             'correct': correct[-1], 'memorized': memorized[-1], 'incorrect': incorrect[-1]
         })
 
-
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
     wandb_project = 'resnet-ce-cdon'
@@ -285,21 +284,21 @@ def main():
     config = dict(
         n_epochs=120,
         batch_size=128,
-        classes=10,
-        noise_rate=0.4,
+        classes=64, #157 categories for clothing # total subcategories is 3516
+        noise_rate=0.0,
         is_symmetric_noise=True,
         fraction=1.0,
-        compute_memorization=True,
-        dataset_name='CIFAR10',  # opt: 'CIFAR10', 'CIFAR100', 'CDON' (not implemented)
-        model_path='./models/CIFAR10_20.mdl',
-        plot_path='./results/CIFAR10_20',
+        compute_memorization=False,
+        dataset_name='CDON',  # opt: 'CIFAR10', 'CIFAR100', 'CDON'
+        model_path='./models/CDON_CE.mdl',
+        plot_path='./results/CDON_CE',
         learning_rate=0.02,
         momentum=0.9,
         weight_decay=1e-3,
         milestones=[40, 80],
         gamma=0.01,
         enable_amp=True,
-        use_ELR=True,
+        use_ELR=False,
         elr_lambda=3.0,
         elr_beta=0.7
     )
@@ -338,12 +337,12 @@ def main():
         'criterion_params': {}
     }
 
-    # use_CosAnneal = {
-    #     'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
-    #     'scheduler_params': {"T_0": 10, "eta_min": 0.001},
-    #     # 'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
-    # }
-    # trainer_config.update(use_CosAnneal)
+    use_CosAnneal = {
+        'scheduler': optim.lr_scheduler.CosineAnnealingWarmRestarts,
+        'scheduler_params': {"T_0": 10, "eta_min": 0.001},
+        # 'scheduler_params': {'T_max': 200, 'eta_min': 0.001}
+    }
+    trainer_config.update(use_CosAnneal)
 
     if config['use_ELR']:
         use_ELR = {
