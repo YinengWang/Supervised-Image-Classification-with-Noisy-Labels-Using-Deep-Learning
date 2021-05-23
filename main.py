@@ -227,39 +227,6 @@ def record_results(filepath, dataset, noise_rate, is_symmetric_noise, enable_amp
             'correct': correct[-1], 'memorized': memorized[-1], 'incorrect': incorrect[-1]
         })
 
-def start_manual_testing(model):
-    # Used to manually assess the accuracy of the model
-    subcat2name = {}
-    with open("/home/dd2424-google/dataset-downloader/dataset/subcat2names.csv") as csvfile: #todo: change path
-        reader = csv.reader(csvfile, delimiter=",")
-        for row in reader:
-            if not int(row[0]) in subcat2name:
-                subcat2name[int(row[0])] = row[1]
-
-    test, label2id = datasets.load_cdon_dataset_testonly()
-    
-    _, test_loader = datasets.load_cdon_dataset(1)
-    model.eval()
-    with torch.no_grad():
-        correct, total = 0, 0
-        for (_, label), sample in zip(test, test_loader):
-            print(label2id)
-            inputs, targets = sample[0].to(device), sample[1].to(device)
-            outputs = model(inputs)
-            _, predicted = outputs.max(1)
-            pred_subcat = label2id[predicted.item()]
-            print(f"The image is loaded as test_on_this.jpg, do you think this image can be categorized into: {subcat2name[int(pred_subcat)]}[y/n]")
-            print("Write q to exit at any moment")
-            answer = input()
-            if answer.lower().startswith("q"):
-                break
-            if answer.lower().startswith("y"):
-                correct += 1
-            total += 1
-            print(f"The given right category is {subcat2name[int(label2id[label.item()])]}")
-        
-        print(f"tested accuracy was {correct / total}")
-
 def model_pipeline(config, trainer_config, loadExistingWeights=False):
     # Start wandb
     wandb_project = 'resnet-ce-cdon'
@@ -273,7 +240,6 @@ def model_pipeline(config, trainer_config, loadExistingWeights=False):
 
         if loadExistingWeights:
             model.load_state_dict(torch.load(config.model_path))
-            start_manual_testing(model)
 
         """load data"""
         print('==> Preparing data..')
